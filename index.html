@@ -700,6 +700,118 @@ tbody tr.selected-row { background: #FFFBD0 !important; }
 }
 
 /* ═══════════════════════════════════════════════
+   DATA CHECKER PAGE
+═══════════════════════════════════════════════ */
+#pg-checker { padding: 24px; }
+.chk-header { margin-bottom: 20px; display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.chk-header h2 { font-family: 'Bebas Neue', sans-serif; font-size: 38px; letter-spacing: 2px; line-height: 1; }
+.chk-header p  { font-size: 13px; color: #666; margin-top: 3px; }
+
+.chk-summary-strip {
+  display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
+}
+.chk-stat {
+  background: #fff; border: var(--b3); box-shadow: var(--shm);
+  padding: 12px 20px; min-width: 100px; position: relative; overflow: hidden; cursor: pointer;
+  transition: transform .08s;
+}
+.chk-stat:hover { transform: translate(-2px,-2px); }
+.chk-stat:active { transform: translate(1px,1px); }
+.chk-stat::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+.chk-stat.cs-missing::after  { background: var(--orange); }
+.chk-stat.cs-dup::after      { background: var(--pink); }
+.chk-stat.cs-pin::after      { background: var(--blue); }
+.chk-stat.cs-format::after   { background: var(--red); }
+.chk-stat.cs-spelling::after { background: #9b59b6; }
+.chk-stat.cs-ok::after       { background: var(--green); }
+.chk-stat .v { font-family: 'Bebas Neue', sans-serif; font-size: 38px; line-height: 1; }
+.chk-stat .l { font-family: 'Space Mono', monospace; font-size: 9px; color: #888; letter-spacing: 1.5px; margin-top: 2px; }
+
+.chk-controls {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  background: var(--off); border: var(--b3); padding: 12px 16px;
+  box-shadow: var(--shm); margin-bottom: 18px;
+}
+.chk-controls label { font-family: 'Space Mono', monospace; font-size: 10px; color: #666; letter-spacing: 1px; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.chk-controls input[type=checkbox] { accent-color: var(--black); width: 15px; height: 15px; }
+.chk-filter-sep { width: 1px; height: 24px; background: #ccc; }
+
+.chk-issue-group { margin-bottom: 18px; }
+.chk-group-head {
+  background: var(--black); color: var(--yellow);
+  padding: 8px 18px; font-family: 'Space Mono', monospace;
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  display: flex; align-items: center; justify-content: space-between;
+  border: var(--b3); border-bottom: none;
+}
+.chk-group-head .gc { font-family: 'Bebas Neue', sans-serif; font-size: 20px; }
+
+.chk-table { width: 100%; border-collapse: collapse; border: var(--b3); box-shadow: var(--shm); background: #fff; }
+.chk-table th {
+  background: #f5f2ee; border-bottom: var(--b2);
+  padding: 8px 14px; font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 1.5px; text-align: left; white-space: nowrap;
+}
+.chk-table td { padding: 10px 14px; border-bottom: 1.5px solid #eae7e0; font-size: 13px; vertical-align: top; }
+.chk-table tr:last-child td { border-bottom: none; }
+.chk-table tr:hover td { background: #FFFCE0; }
+.chk-table tr.issue-fixed td { background: #e8f8f0; opacity: .6; }
+
+.issue-badge {
+  display: inline-block; padding: 2px 8px; font-size: 10px; font-weight: 700;
+  letter-spacing: 1px; border: 1px solid; white-space: nowrap;
+}
+.ib-missing  { background: #fff3e0; color: var(--orange); border-color: var(--orange); }
+.ib-dup      { background: #ffe0ea; color: var(--pink);   border-color: var(--pink); }
+.ib-pin      { background: #e0eaff; color: var(--blue);   border-color: var(--blue); }
+.ib-format   { background: #ffe0e0; color: var(--red);    border-color: var(--red); }
+.ib-spelling { background: #f3e0ff; color: #7c3aed;       border-color: #9b59b6; }
+
+.fix-val { font-family: 'Space Mono', monospace; font-size: 11px; }
+.fix-val .old { color: var(--red); text-decoration: line-through; margin-right: 4px; }
+.fix-val .nw  { color: var(--green); font-weight: 700; }
+
+.chk-empty {
+  text-align: center; padding: 60px 20px; border: var(--b3);
+  background: #fff; box-shadow: var(--shm);
+}
+.chk-empty .big { font-family: 'Bebas Neue', sans-serif; font-size: 60px; color: #ddd; }
+.chk-empty p { font-family: 'Space Mono', monospace; font-size: 11px; color: #aaa; margin-top: 6px; }
+
+.chk-progress-wrap {
+  background: #e8e4dc; border: var(--b2); height: 22px; overflow: hidden; margin-bottom: 12px; display: none;
+}
+.chk-progress-fill {
+  height: 100%; background: var(--blue); transition: width .3s;
+  display: flex; align-items: center; padding-left: 10px;
+}
+.chk-progress-fill span { font-family: 'Space Mono', monospace; font-size: 9px; color: #fff; white-space: nowrap; }
+
+/* ═══════════════════════════════════════════════
+   PINCODE VERIFY
+═══════════════════════════════════════════════ */
+.pin-verify-bar {
+  display: none;
+  align-items: flex-start; gap: 10px; flex-wrap: wrap;
+  padding: 10px 16px;
+  background: #fff8e1; border: 2px solid var(--orange);
+  box-shadow: var(--shs); margin-top: 8px;
+}
+.pin-verify-bar.show { display: flex; }
+.pin-verify-bar.ok   { background: #e8f8f0; border-color: var(--green); }
+.pin-verify-bar.err  { background: #fff0f0; border-color: var(--red); }
+.pin-verify-msg { flex: 1; font-size: 13px; font-weight: 600; }
+.pin-verify-msg small { display: block; font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 400; color: #666; margin-top: 3px; }
+.pin-mismatch-item {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-family: 'Space Mono', monospace; font-size: 11px;
+  background: #fff; border: var(--b2); padding: 6px 10px; margin-top: 6px;
+}
+.pin-mismatch-item .old { text-decoration: line-through; color: var(--red); }
+.pin-mismatch-item .nw  { color: var(--green); font-weight: 700; }
+#pin-verify-status-reg, #pin-verify-status-modal { font-family: 'Space Mono', monospace; font-size: 10px; color: #888; }
+
+/* ═══════════════════════════════════════════════
    RESPONSIVE
 ═══════════════════════════════════════════════ */
 @media(max-width:700px){
@@ -749,6 +861,9 @@ tbody tr.selected-row { background: #FFFBD0 !important; }
     </button>
     <button class="tab-btn" data-tab="bulk" onclick="switchTab('bulk')">
       ⚡ BULK REGISTER
+    </button>
+    <button class="tab-btn" data-tab="checker" onclick="switchTab('checker')">
+      🔍 DATA CHECKER <span class="tab-count" id="tc-issues" style="background:var(--red);">0</span>
     </button>
   </div>
   <div class="nav-right">
@@ -978,8 +1093,18 @@ tbody tr.selected-row { background: #FFFBD0 !important; }
         <div class="fld"><label>City</label><input id="r-city" placeholder="City / Town" /></div>
         <div class="fld"><label>Street</label><input id="r-street" placeholder="Street / Colony" /></div>
         <div class="fld"><label>Door No</label><input id="r-doorNo" placeholder="Door / Flat No." /></div>
-        <div class="fld"><label>Pincode</label><input id="r-pincode" placeholder="6-digit pincode" maxlength="6" /></div>
+        <div class="fld"><label>Pincode</label><input id="r-pincode" placeholder="6-digit pincode" maxlength="6" oninput="onPincodeInput('reg')" /></div>
       </div>
+
+      <!-- Pincode Verify Bar -->
+      <div id="pin-verify-bar-reg" class="pin-verify-bar">
+        <div style="flex:1;">
+          <div class="pin-verify-msg" id="pin-verify-msg-reg"></div>
+          <div id="pin-verify-items-reg"></div>
+        </div>
+        <span id="pin-verify-status-reg"></span>
+      </div>
+
       <!-- Address AI -->
       <div class="addr-bar">
         <button class="nb nb-blue nb-sm" onclick="runAddressFill()">🌐 SMART-FILL ADDRESS</button>
@@ -1137,6 +1262,71 @@ tbody tr.selected-row { background: #FFFBD0 !important; }
   </div>
 </div>
 
+<!-- ═══════════════════ PAGE: DATA CHECKER ═══════════════════ -->
+<div class="page" id="pg-checker">
+
+  <div class="chk-header">
+    <div>
+      <h2>DATA CHECKER</h2>
+      <p>Scan existing database records for issues — missing fields, duplicates, pincode mismatches &amp; spelling errors</p>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <button class="nb nb-blue" id="btn-run-checker" onclick="runChecker()">🔍 SCAN DATABASE</button>
+      <button class="nb nb-green nb-sm" id="btn-fix-all" onclick="fixAllIssues()" style="display:none;">⚡ FIX ALL AUTO-FIXABLE</button>
+    </div>
+  </div>
+
+  <!-- Summary strip -->
+  <div class="chk-summary-strip" id="chk-summary-strip" style="display:none;">
+    <div class="chk-stat cs-ok" onclick="chkFilter('all')">
+      <div class="v" id="cs-scanned">0</div><div class="l">SCANNED</div>
+    </div>
+    <div class="chk-stat cs-missing" onclick="chkFilter('missing')">
+      <div class="v" id="cs-missing">0</div><div class="l">MISSING FIELDS</div>
+    </div>
+    <div class="chk-stat cs-dup" onclick="chkFilter('duplicate')">
+      <div class="v" id="cs-dup">0</div><div class="l">DUPLICATES</div>
+    </div>
+    <div class="chk-stat cs-pin" onclick="chkFilter('pincode')">
+      <div class="v" id="cs-pin">0</div><div class="l">PIN MISMATCHES</div>
+    </div>
+    <div class="chk-stat cs-format" onclick="chkFilter('format')">
+      <div class="v" id="cs-format">0</div><div class="l">FORMAT ERRORS</div>
+    </div>
+    <div class="chk-stat cs-spelling" onclick="chkFilter('spelling')">
+      <div class="v" id="cs-spelling">0</div><div class="l">SPELLING</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="chk-controls" id="chk-controls" style="display:none;">
+    <span style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;font-weight:700;">SHOW:</span>
+    <label><input type="checkbox" id="chk-f-missing"  checked onchange="renderCheckerResults()"> MISSING FIELDS</label>
+    <label><input type="checkbox" id="chk-f-dup"      checked onchange="renderCheckerResults()"> DUPLICATES</label>
+    <label><input type="checkbox" id="chk-f-pin"      checked onchange="renderCheckerResults()"> PINCODE MISMATCH</label>
+    <label><input type="checkbox" id="chk-f-format"   checked onchange="renderCheckerResults()"> FORMAT ERRORS</label>
+    <label><input type="checkbox" id="chk-f-spelling" checked onchange="renderCheckerResults()"> SPELLING ISSUES</label>
+    <div class="chk-filter-sep"></div>
+    <span id="chk-result-count" style="font-family:'Space Mono',monospace;font-size:10px;color:#888;"></span>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="chk-progress-wrap" id="chk-progress-wrap">
+    <div class="chk-progress-fill" id="chk-progress-fill" style="width:0%">
+      <span id="chk-progress-txt">SCANNING…</span>
+    </div>
+  </div>
+
+  <!-- Results container -->
+  <div id="chk-results"></div>
+
+  <!-- Initial empty state -->
+  <div class="chk-empty" id="chk-empty-state">
+    <div class="big">READY</div>
+    <p>CLICK "SCAN DATABASE" TO CHECK ALL RECORDS FOR ISSUES<br>REQUIRES AN ACTIVE SUPABASE CONNECTION</p>
+  </div>
+</div>
+
 <!-- ═══════════════════ EDIT/ADD MODAL ═══════════════════ -->
 <div class="overlay" id="form-overlay">
   <div class="modal">
@@ -1157,7 +1347,7 @@ tbody tr.selected-row { background: #FFFBD0 !important; }
       <div class="fld"><label>State</label><input id="f-state" /></div>
       <div class="fld"><label>District</label><input id="f-district" /></div>
       <div class="fld"><label>City</label><input id="f-city" /></div>
-      <div class="fld"><label>Pincode</label><input id="f-pincode" /></div>
+      <div class="fld"><label>Pincode</label><input id="f-pincode" oninput="onPincodeInput('modal')" /></div>
       <div class="fld mfull"><label>Street</label><input id="f-street" /></div>
       <div class="fld"><label>Door No</label><input id="f-doorNo" /></div>
       <div class="fld mfull">
@@ -1169,6 +1359,16 @@ tbody tr.selected-row { background: #FFFBD0 !important; }
             <input type="file" id="m-photo-input" accept="image/*" style="display:none" onchange="handleModalPhoto(event)" />
             <div style="font-family:'Space Mono',monospace;font-size:9px;color:#aaa;margin-top:4px;letter-spacing:1px;">JPG/PNG — STORED AS BASE64 — MAX 2MB</div>
           </div>
+        </div>
+      </div>
+      <!-- Pincode Verify Bar (modal) -->
+      <div class="fld mfull">
+        <div id="pin-verify-bar-modal" class="pin-verify-bar">
+          <div style="flex:1;">
+            <div class="pin-verify-msg" id="pin-verify-msg-modal"></div>
+            <div id="pin-verify-items-modal"></div>
+          </div>
+          <span id="pin-verify-status-modal"></span>
         </div>
       </div>
     </div>
@@ -1297,6 +1497,7 @@ function switchTab(tab) {
   if(tab==='detail')   { document.getElementById('pg-detail').classList.add('active'); document.getElementById('search-bar').style.display='none'; document.getElementById('ai-drawer').classList.remove('open'); }
   if(tab==='register') { document.getElementById('pg-register').classList.add('active'); document.getElementById('search-bar').style.display='none'; document.getElementById('ai-drawer').classList.remove('open'); }
   if(tab==='bulk')     { document.getElementById('pg-bulk').classList.add('active'); document.getElementById('search-bar').style.display='none'; document.getElementById('ai-drawer').classList.remove('open'); }
+  if(tab==='checker')  { document.getElementById('pg-checker').classList.add('active'); document.getElementById('search-bar').style.display='none'; document.getElementById('ai-drawer').classList.remove('open'); }
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -2112,6 +2313,135 @@ Current: state="${state}", district="${district}", city="${city}", pincode="${pi
     aiProgressDone(n>0?`${n} FIELD(S) CORRECTED`:'ADDRESS LOOKS CORRECT','✅');
   }catch(e){st.innerHTML=`<span style="color:var(--red);">❌ ${e.message}</span>`;toast('ADDRESS AI ERROR: '+e.message,'err');aiProgressDone('ADDRESS AI ERROR','❌');}
   btn.disabled=false;
+}
+
+// ════════════════════════════════════════════
+// PINCODE DISTRICT/STATE VERIFICATION
+// ════════════════════════════════════════════
+let _pinDebounce = {};
+
+function onPincodeInput(ctx) {
+  const pinEl = document.getElementById(ctx === 'reg' ? 'r-pincode' : 'f-pincode');
+  const pin = pinEl.value.trim();
+  clearTimeout(_pinDebounce[ctx]);
+  hidePinBar(ctx);
+  if (pin.length === 6 && /^\d{6}$/.test(pin)) {
+    _pinDebounce[ctx] = setTimeout(() => verifyPincode(pin, ctx), 600);
+  }
+}
+
+function hidePinBar(ctx) {
+  const bar = document.getElementById(`pin-verify-bar-${ctx}`);
+  bar.className = 'pin-verify-bar';
+}
+
+async function verifyPincode(pin, ctx) {
+  const statusEl = document.getElementById(`pin-verify-status-${ctx}`);
+  const msgEl    = document.getElementById(`pin-verify-msg-${ctx}`);
+  const itemsEl  = document.getElementById(`pin-verify-items-${ctx}`);
+  const bar      = document.getElementById(`pin-verify-bar-${ctx}`);
+
+  const prefix = ctx === 'reg' ? 'r-' : 'f-';
+  const districtEl = document.getElementById(prefix + 'district');
+  const stateEl    = document.getElementById(prefix + 'state');
+
+  statusEl.textContent = '⏳ CHECKING…';
+  bar.className = 'pin-verify-bar show';
+  msgEl.textContent = '';
+  itemsEl.innerHTML = '';
+
+  try {
+    const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+    if (!res.ok) throw new Error('Network error');
+    const data = await res.json();
+
+    if (!data[0] || data[0].Status !== 'Success' || !data[0].PostOffice?.length) {
+      bar.className = 'pin-verify-bar show err';
+      msgEl.innerHTML = '⚠ Pincode not found in database';
+      msgEl.querySelector?.('small')?.remove();
+      msgEl.insertAdjacentHTML('beforeend', '<small>Check if pincode is correct</small>');
+      statusEl.textContent = '';
+      return;
+    }
+
+    const offices = data[0].PostOffice;
+    const apiDistrict = offices[0].District.trim();
+    const apiState    = offices[0].State.trim();
+    const apiDivision = offices[0].Division?.trim() || '';
+
+    const curDistrict = (districtEl?.value || '').trim();
+    const curState    = (stateEl?.value || '').trim();
+
+    const districtMatch = curDistrict === '' || curDistrict.toLowerCase() === apiDistrict.toLowerCase();
+    const stateMatch    = curState    === '' || curState.toLowerCase()    === apiState.toLowerCase();
+
+    const mismatches = [];
+    if (!districtMatch && curDistrict) mismatches.push({ field: 'District', fieldId: prefix + 'district', current: curDistrict, correct: apiDistrict });
+    if (!stateMatch    && curState)    mismatches.push({ field: 'State',    fieldId: prefix + 'state',    current: curState,    correct: apiState });
+
+    statusEl.textContent = '';
+
+    if (mismatches.length === 0) {
+      bar.className = 'pin-verify-bar show ok';
+      msgEl.innerHTML = `✅ Pincode ${pin} verified — ${apiDistrict}, ${apiState}`;
+      if (!curDistrict && apiDistrict) {
+        // Auto-fill empty fields
+        if (districtEl && !districtEl.value.trim()) { districtEl.value = apiDistrict; flash(districtEl); }
+        if (stateEl    && !stateEl.value.trim())    { stateEl.value    = apiState;    flash(stateEl);    }
+        msgEl.innerHTML += '<small>Empty fields auto-filled from pincode</small>';
+      }
+    } else {
+      bar.className = 'pin-verify-bar show';
+      msgEl.innerHTML = `⚠ Spelling mismatch detected for Pincode ${pin}`;
+      msgEl.insertAdjacentHTML('beforeend', `<small>Correct values from India Post: <strong>${apiDistrict}</strong>, <strong>${apiState}</strong></small>`);
+
+      mismatches.forEach(m => {
+        const id = `pin-fix-${ctx}-${m.field.toLowerCase()}`;
+        itemsEl.insertAdjacentHTML('beforeend', `
+          <div class="pin-mismatch-item">
+            <span style="color:#888;font-weight:700;">${m.field.toUpperCase()}:</span>
+            <span class="old">${m.current}</span>
+            <span>→</span>
+            <span class="nw">${m.correct}</span>
+            <button class="nb nb-green nb-sm" style="margin-left:auto;" id="${id}"
+              onclick="applyPinFix('${m.fieldId}','${m.correct}','${ctx}','${m.field}')">
+              ✓ UPDATE TO "${m.correct}"
+            </button>
+          </div>`);
+      });
+
+      if (mismatches.length > 1) {
+        window._pinMismatches = window._pinMismatches || {};
+        window._pinMismatches[ctx] = mismatches;
+        itemsEl.insertAdjacentHTML('beforeend', `
+          <div style="margin-top:6px;">
+            <button class="nb nb-orange nb-sm" onclick="applyAllPinFixes('${ctx}')">⚡ UPDATE ALL</button>
+          </div>`);
+      }
+    }
+  } catch(e) {
+    bar.className = 'pin-verify-bar show err';
+    msgEl.innerHTML = `❌ Could not verify pincode: ${e.message}`;
+    statusEl.textContent = '';
+  }
+}
+
+function applyPinFix(fieldId, correctValue, ctx, fieldLabel) {
+  const el = document.getElementById(fieldId);
+  if (!el) return;
+  const old = el.value;
+  el.value = correctValue;
+  flash(el);
+  toast(`${fieldLabel.toUpperCase()} UPDATED: "${old}" → "${correctValue}"`, 'ok');
+  // Re-run verify to refresh bar
+  const pinEl = document.getElementById(ctx === 'reg' ? 'r-pincode' : 'f-pincode');
+  if (pinEl?.value.length === 6) verifyPincode(pinEl.value.trim(), ctx);
+}
+
+function applyAllPinFixes(ctx) {
+  const mismatches = (window._pinMismatches || {})[ctx];
+  if (!mismatches) return;
+  mismatches.forEach(m => applyPinFix(m.fieldId, m.correct, ctx, m.field));
 }
 
 // ════════════════════════════════════════════
@@ -3541,6 +3871,565 @@ async function runReassign() {
 
 // Initial hide search bar when not on list tab
 switchTab('list');
+
+// ════════════════════════════════════════════
+// DATA CHECKER
+// ════════════════════════════════════════════
+let checkerIssues = [];
+let checkerFixed  = new Set();
+
+// ── Title-case helper: "HYDERABAD" → "Hyderabad", "new delhi" → "New Delhi"
+function toTitleCase(str) {
+  return str.toLowerCase().replace(/(?:^|\s|[-\/])\S/g, c => c.toUpperCase());
+}
+// Words that stay lowercase in title-case (prepositions/conjunctions inside names)
+const LC_WORDS = new Set(['and','of','the','in','at','by','for','to','an','a','or','de','das','al']);
+function toProperCase(str) {
+  return str.toLowerCase().split(' ').map((w, i) =>
+    (i === 0 || !LC_WORDS.has(w)) ? w.charAt(0).toUpperCase() + w.slice(1) : w
+  ).join(' ');
+}
+
+async function runChecker() {
+  if (!SB_URL) { toast('CONNECT TO SUPABASE FIRST', 'err'); return; }
+  if (!allRecords.length) { toast('NO RECORDS TO SCAN', 'err'); return; }
+
+  checkerIssues = [];
+  checkerFixed  = new Set();
+
+  const btn = document.getElementById('btn-run-checker');
+  btn.disabled = true; btn.textContent = '⏳ SCANNING…';
+  document.getElementById('chk-empty-state').style.display = 'none';
+  document.getElementById('chk-results').innerHTML = '';
+  document.getElementById('chk-summary-strip').style.display = 'none';
+  document.getElementById('chk-controls').style.display = 'none';
+  document.getElementById('btn-fix-all').style.display = 'none';
+
+  const prog     = document.getElementById('chk-progress-wrap');
+  const progFill = document.getElementById('chk-progress-fill');
+  const progTxt  = document.getElementById('chk-progress-txt');
+  prog.style.display = '';
+  progFill.style.width = '3%';
+  progTxt.textContent = 'STARTING SCAN…';
+
+  const REQUIRED_FIELDS = ['idNumber','sevakName','dob','mobileNo','gender','state'];
+  const ALL_FIELDS = ['idNumber','code','sevakName','surName','dob','mobileNo','email','gender','state','district','city','pincode'];
+  const records = [...allRecords];
+
+  // ══════════════════════════════════════════
+  // 1. MISSING / EMPTY FIELDS
+  // ══════════════════════════════════════════
+  progTxt.textContent = 'CHECKING MISSING FIELDS…'; progFill.style.width = '10%';
+  for (const rec of records) {
+    const missing = REQUIRED_FIELDS.filter(f => !rec[f] || String(rec[f]).trim() === '');
+    const empty   = ALL_FIELDS.filter(f => !rec[f] || String(rec[f]).trim() === '');
+    if (missing.length > 0) {
+      checkerIssues.push({ type:'missing', severity:'high', record:rec,
+        label:'Missing Required Fields',
+        detail: missing.map(f => f.toUpperCase()).join(', '),
+        fields: missing, autofix: false });
+    } else if (empty.length > 0) {
+      checkerIssues.push({ type:'missing', severity:'low', record:rec,
+        label:'Empty Optional Fields',
+        detail: empty.map(f => f.toUpperCase()).join(', '),
+        fields: empty, autofix: false });
+    }
+  }
+
+  // ══════════════════════════════════════════
+  // 2. DUPLICATES — ID, Mobile, Email, Name
+  // ══════════════════════════════════════════
+  progTxt.textContent = 'CHECKING DUPLICATES…'; progFill.style.width = '22%';
+
+  function buildDupIssues(mapObj, seenSet, labelFn, detailFn, severity) {
+    for (const [key, recs] of Object.entries(mapObj)) {
+      if (recs.length < 2 || !key) continue;
+      recs.forEach(r => {
+        if (!seenSet.has(r.id + '_' + key)) {
+          seenSet.add(r.id + '_' + key);
+          checkerIssues.push({
+            type:'duplicate', severity, record:r,
+            label: labelFn(key, recs),
+            detail: detailFn(key, recs, r),
+            dupeWith: recs.filter(x => x.id !== r.id),
+            autofix: false
+          });
+        }
+      });
+    }
+  }
+
+  const seenIdMap={}, seenMobMap={}, seenEmailMap={}, seenNameMap={};
+  for (const rec of records) {
+    const id    = String(rec.idNumber||'').trim().toLowerCase();
+    const mob   = String(rec.mobileNo||'').replace(/\D/g,'').trim();
+    const email = String(rec.email||'').trim().toLowerCase();
+    const name  = [rec.sevakName, rec.surName].filter(Boolean).join(' ').toLowerCase().trim();
+    if (id)    { (seenIdMap[id]    = seenIdMap[id]    || []).push(rec); }
+    if (mob && mob.length === 10) { (seenMobMap[mob]   = seenMobMap[mob]   || []).push(rec); }
+    if (email) { (seenEmailMap[email] = seenEmailMap[email] || []).push(rec); }
+    if (name)  { (seenNameMap[name]   = seenNameMap[name]   || []).push(rec); }
+  }
+  const _ds = new Set();
+  buildDupIssues(seenIdMap,    _ds, (k,rs) => 'Duplicate ID Number',
+    (k,rs,r) => `ID "${r.idNumber}" shared by ${rs.length} records`, 'high');
+  buildDupIssues(seenMobMap,   _ds, (k,rs) => 'Duplicate Mobile Number',
+    (k,rs,r) => `Mobile "${r.mobileNo}" used by ${rs.length} records`, 'high');
+  buildDupIssues(seenEmailMap, _ds, (k,rs) => 'Duplicate Email',
+    (k,rs,r) => `Email "${r.email}" used by ${rs.length} records`, 'medium');
+  buildDupIssues(seenNameMap,  _ds, (k,rs) => 'Duplicate Full Name',
+    (k,rs,r) => `"${[r.sevakName,r.surName].filter(Boolean).join(' ')}" appears ${rs.length} times`, 'low');
+
+  // ══════════════════════════════════════════
+  // 3. LENGTH / FORMAT CHECKS
+  // ══════════════════════════════════════════
+  progTxt.textContent = 'CHECKING FIELD LENGTHS & FORMATS…'; progFill.style.width = '38%';
+
+  for (const rec of records) {
+
+    // ── Pincode: must be exactly 6 digits
+    const pin = String(rec.pincode || '').trim();
+    if (pin) {
+      if (!/^\d+$/.test(pin)) {
+        checkerIssues.push({ type:'format', severity:'high', record:rec,
+          label:'Pincode Contains Non-Digits',
+          detail:`"${pin}" — pincode must contain only digits`, fixes:[], autofix:false });
+      } else if (pin.length !== 6) {
+        checkerIssues.push({ type:'format', severity:'high', record:rec,
+          label:'Pincode Wrong Length',
+          detail:`"${pin}" is ${pin.length} digit${pin.length!==1?'s':''} — must be exactly 6`, fixes:[], autofix:false });
+      }
+    }
+
+    // ── Mobile: exactly 10 digits, starts 6–9
+    const mob = String(rec.mobileNo || '').replace(/\D/g,'').trim();
+    if (mob) {
+      if (mob.length !== 10) {
+        checkerIssues.push({ type:'format', severity:'high', record:rec,
+          label:'Mobile Wrong Length',
+          detail:`"${rec.mobileNo}" has ${mob.length} digits — must be exactly 10`,
+          fixes: mob.length > 10 ? [{ field:'mobileNo', fieldLabel:'Mobile', current:rec.mobileNo, correct:mob.slice(-10) }] : [],
+          autofix: mob.length > 10 });
+      } else if (!/^[6-9]/.test(mob)) {
+        checkerIssues.push({ type:'format', severity:'medium', record:rec,
+          label:'Mobile Invalid Prefix',
+          detail:`"${rec.mobileNo}" — Indian numbers must start with 6, 7, 8, or 9`,
+          fixes:[], autofix:false });
+      }
+    }
+
+    // ── ID Number: must not be blank, no leading/trailing spaces
+    const idRaw = rec.idNumber || '';
+    if (idRaw !== idRaw.trim()) {
+      checkerIssues.push({ type:'format', severity:'medium', record:rec,
+        label:'ID Number Has Extra Spaces',
+        detail:`"${idRaw}" has leading/trailing whitespace`,
+        fixes:[{ field:'idNumber', fieldLabel:'ID Number', current:idRaw, correct:idRaw.trim() }],
+        autofix:true });
+    }
+
+    // ── DOB: format check + plausibility
+    const dob = String(rec.dob || '').trim();
+    if (dob) {
+      const fmtOk = /^\d{2}\/\d{2}\/\d{4}$/.test(dob) || /^\d{4}-\d{2}-\d{2}$/.test(dob);
+      if (!fmtOk) {
+        checkerIssues.push({ type:'format', severity:'medium', record:rec,
+          label:'DOB Wrong Format',
+          detail:`"${dob}" — expected DD/MM/YYYY or YYYY-MM-DD`,
+          fixes:[], autofix:false });
+      } else {
+        // plausibility: age between 5 and 120
+        let year = null;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dob)) year = parseInt(dob.slice(0,4));
+        else year = parseInt(dob.slice(6,10));
+        const age = new Date().getFullYear() - year;
+        if (age < 5 || age > 120) {
+          checkerIssues.push({ type:'format', severity:'medium', record:rec,
+            label:'DOB Implausible Year',
+            detail:`Birth year ${year} gives age ~${age} — seems unlikely`,
+            fixes:[], autofix:false });
+        }
+      }
+    }
+
+    // ── Email: basic format
+    const email = String(rec.email || '').trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      checkerIssues.push({ type:'format', severity:'medium', record:rec,
+        label:'Invalid Email Format',
+        detail:`"${email}" doesn't look like a valid email address`,
+        fixes:[], autofix:false });
+    }
+  }
+
+  // ══════════════════════════════════════════
+  // 4. PINCODE → DISTRICT / STATE MISMATCH
+  // ══════════════════════════════════════════
+  progTxt.textContent = 'VERIFYING PINCODES…'; progFill.style.width = '50%';
+  const validPinRecs = records.filter(r => r.pincode && /^\d{6}$/.test(String(r.pincode).trim()));
+  const uniquePins   = [...new Set(validPinRecs.map(r => String(r.pincode).trim()))];
+  const pinCache = {};
+  const maxPins  = Math.min(uniquePins.length, 60);
+  for (let i = 0; i < maxPins; i++) {
+    const pin = uniquePins[i];
+    progFill.style.width = (50 + Math.round((i / Math.max(maxPins,1)) * 18)) + '%';
+    progTxt.textContent  = `VERIFYING PINCODES… ${i+1}/${maxPins}`;
+    try {
+      const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+      if (res.ok) {
+        const data = await res.json();
+        pinCache[pin] = (data[0]?.Status === 'Success' && data[0].PostOffice?.length)
+          ? { district: data[0].PostOffice[0].District.trim(), state: data[0].PostOffice[0].State.trim() }
+          : null;
+      }
+    } catch { pinCache[pin] = 'error'; }
+    await new Promise(r => setTimeout(r, 80));
+  }
+  for (const rec of validPinRecs) {
+    const pin = String(rec.pincode).trim();
+    const api = pinCache[pin];
+    if (!api || api === 'error') continue;
+    const fixes = [];
+    const cd = String(rec.district||'').trim(), cs = String(rec.state||'').trim();
+    if (cd && cd.toLowerCase() !== api.district.toLowerCase())
+      fixes.push({ field:'district', fieldLabel:'District', current:cd, correct:api.district });
+    if (cs && cs.toLowerCase() !== api.state.toLowerCase())
+      fixes.push({ field:'state', fieldLabel:'State', current:cs, correct:api.state });
+    if (!cd && api.district) fixes.push({ field:'district', fieldLabel:'District', current:'', correct:api.district, fill:true });
+    if (!cs && api.state)    fixes.push({ field:'state',    fieldLabel:'State',    current:'', correct:api.state,    fill:true });
+    if (fixes.length) checkerIssues.push({
+      type:'pincode', severity: fixes.some(f=>!f.fill)?'medium':'low', record:rec,
+      label: fixes.some(f=>!f.fill) ? 'Pincode Mismatch' : 'Pincode Auto-fill Available',
+      detail:`PIN ${pin} → ${api.district}, ${api.state}`, fixes, autofix:true
+    });
+  }
+
+  // ══════════════════════════════════════════
+  // 5. SPELLING & CASING CHECKS
+  // ══════════════════════════════════════════
+  progTxt.textContent = 'CHECKING SPELLING & CASING…'; progFill.style.width = '72%';
+
+  // ── State canonical map (misspellings + casing)
+  const STATE_MAP = {
+    'andhra pradesh':'Andhra Pradesh','telangana':'Telangana','maharashtra':'Maharashtra',
+    'karnataka':'Karnataka','tamil nadu':'Tamil Nadu','tamilnadu':'Tamil Nadu',
+    'kerala':'Kerala','gujarat':'Gujarat','rajasthan':'Rajasthan',
+    'madhya pradesh':'Madhya Pradesh','uttar pradesh':'Uttar Pradesh',
+    'west bengal':'West Bengal','bihar':'Bihar','jharkhand':'Jharkhand',
+    'odisha':'Odisha','orissa':'Odisha','orisha':'Odisha',
+    'punjab':'Punjab','haryana':'Haryana','delhi':'Delhi','new delhi':'Delhi',
+    'himachal pradesh':'Himachal Pradesh','uttarakhand':'Uttarakhand',
+    'uttaranchal':'Uttarakhand','jammu and kashmir':'Jammu and Kashmir',
+    'jammu & kashmir':'Jammu and Kashmir','assam':'Assam',
+    'arunachal pradesh':'Arunachal Pradesh','manipur':'Manipur',
+    'meghalaya':'Meghalaya','mizoram':'Mizoram','nagaland':'Nagaland',
+    'sikkim':'Sikkim','tripura':'Tripura','goa':'Goa',
+    'chhattisgarh':'Chhattisgarh','chattisghar':'Chhattisgarh','chhatisgarh':'Chhattisgarh',
+    'andaman and nicobar islands':'Andaman and Nicobar Islands',
+    'chandigarh':'Chandigarh','dadra and nagar haveli':'Dadra and Nagar Haveli',
+    'daman and diu':'Daman and Diu','lakshadweep':'Lakshadweep',
+    'puducherry':'Puducherry','pondicherry':'Puducherry','ladakh':'Ladakh'
+  };
+
+  for (const rec of records) {
+    // ── State spelling/casing
+    const stateRaw = String(rec.state||'').trim();
+    if (stateRaw) {
+      const canonical = STATE_MAP[stateRaw.toLowerCase()];
+      if (canonical && canonical !== stateRaw) {
+        checkerIssues.push({ type:'spelling', severity:'medium', record:rec,
+          label:'State Name Spelling / Casing',
+          detail:`"${stateRaw}" → "${canonical}"`,
+          fixes:[{ field:'state', fieldLabel:'State', current:stateRaw, correct:canonical }],
+          autofix:true });
+      }
+    }
+
+    // ── Text fields: detect ALL-CAPS or all-lowercase, auto-fix to Title Case
+    const TEXT_FIELDS = [
+      { key:'sevakName',  label:'Sevak Name' },
+      { key:'surName',    label:'Surname' },
+      { key:'fatherOrSpouseName', label:'Father/Spouse Name' },
+      { key:'city',       label:'City' },
+      { key:'district',   label:'District' },
+      { key:'street',     label:'Street' },
+    ];
+    for (const {key, label} of TEXT_FIELDS) {
+      const raw = String(rec[key]||'').trim();
+      if (!raw || raw.length < 2) continue;
+      const letters = raw.replace(/[^a-zA-Z]/g,'');
+      if (!letters) continue;
+      const allCaps = letters === letters.toUpperCase();
+      const allLower = letters === letters.toLowerCase();
+      if (allCaps || allLower) {
+        const fixed = toProperCase(raw);
+        if (fixed !== raw) {
+          checkerIssues.push({ type:'spelling', severity:'low', record:rec,
+            label: `${label} Wrong Casing`,
+            detail:`"${raw}" → "${fixed}"`,
+            fixes:[{ field:key, fieldLabel:label, current:raw, correct:fixed }],
+            autofix:true });
+        }
+      }
+    }
+
+    // ── Gender: normalize casing/shorthand
+    const gRaw = String(rec.gender||'').trim();
+    if (gRaw) {
+      const gMap = { male:'Male', female:'Female', other:'Other', m:'Male', f:'Female', o:'Other',
+                     'male ':'Male', ' male':'Male', 'female ':'Female', ' female':'Female' };
+      const gCanon = gMap[gRaw.toLowerCase()];
+      if (gCanon && gCanon !== gRaw) {
+        checkerIssues.push({ type:'spelling', severity:'low', record:rec,
+          label:'Gender Casing / Shorthand',
+          detail:`"${gRaw}" → "${gCanon}"`,
+          fixes:[{ field:'gender', fieldLabel:'Gender', current:gRaw, correct:gCanon }],
+          autofix:true });
+      }
+    }
+
+    // ── Extra whitespace in text fields
+    const WS_FIELDS = ['sevakName','surName','city','district','state','street','idNumber','code'];
+    for (const key of WS_FIELDS) {
+      const raw = String(rec[key]||'');
+      const cleaned = raw.trim().replace(/\s{2,}/g,' ');
+      if (cleaned !== raw && cleaned.length > 0) {
+        checkerIssues.push({ type:'spelling', severity:'low', record:rec,
+          label:'Extra Whitespace',
+          detail:`${key}: "${raw}" has extra spaces`,
+          fixes:[{ field:key, fieldLabel:key, current:raw, correct:cleaned }],
+          autofix:true });
+      }
+    }
+  }
+
+  progFill.style.width = '100%';
+  progTxt.textContent = `SCAN COMPLETE — ${checkerIssues.length} ISSUE(S) FOUND`;
+  setTimeout(() => { prog.style.display = 'none'; }, 1400);
+
+  updateCheckerStats();
+  renderCheckerResults();
+  document.getElementById('chk-summary-strip').style.display = '';
+  document.getElementById('chk-controls').style.display = '';
+  if (checkerIssues.some(i => i.autofix)) document.getElementById('btn-fix-all').style.display = '';
+  document.getElementById('tc-issues').textContent = checkerIssues.length;
+  btn.disabled = false; btn.textContent = '🔍 RESCAN';
+  toast(`SCAN DONE — ${checkerIssues.length} ISSUE(S) FOUND`, checkerIssues.length > 0 ? 'err' : 'ok');
+}
+
+function updateCheckerStats() {
+  document.getElementById('cs-scanned').textContent  = allRecords.length;
+  document.getElementById('cs-missing').textContent  = checkerIssues.filter(i => i.type === 'missing').length;
+  document.getElementById('cs-dup').textContent      = checkerIssues.filter(i => i.type === 'duplicate').length;
+  document.getElementById('cs-pin').textContent      = checkerIssues.filter(i => i.type === 'pincode').length;
+  document.getElementById('cs-format').textContent   = checkerIssues.filter(i => i.type === 'format').length;
+  document.getElementById('cs-spelling').textContent = checkerIssues.filter(i => i.type === 'spelling').length;
+  document.getElementById('tc-issues').textContent   = checkerIssues.filter(i => !checkerFixed.has(i.record.id + '_' + i.type + '_' + (i.label||''))).length;
+}
+
+let _chkActiveFilter = 'all';
+function chkFilter(type) {
+  _chkActiveFilter = type;
+  const allBoxes = ['chk-f-missing','chk-f-dup','chk-f-pin','chk-f-format','chk-f-spelling'];
+  if (type !== 'all') {
+    const map = { missing:'chk-f-missing', duplicate:'chk-f-dup', pincode:'chk-f-pin', format:'chk-f-format', spelling:'chk-f-spelling' };
+    allBoxes.forEach(id => { document.getElementById(id).checked = (id === map[type]); });
+  } else {
+    allBoxes.forEach(id => { document.getElementById(id).checked = true; });
+  }
+  renderCheckerResults();
+}
+
+function renderCheckerResults() {
+  const showMissing  = document.getElementById('chk-f-missing')?.checked;
+  const showDup      = document.getElementById('chk-f-dup')?.checked;
+  const showPin      = document.getElementById('chk-f-pin')?.checked;
+  const showFormat   = document.getElementById('chk-f-format')?.checked;
+  const showSpelling = document.getElementById('chk-f-spelling')?.checked;
+
+  const typeVisible = { missing:showMissing, duplicate:showDup, pincode:showPin, format:showFormat, spelling:showSpelling };
+  const visible = checkerIssues.filter(i => typeVisible[i.type]);
+
+  document.getElementById('chk-result-count').textContent = `${visible.length} ISSUE(S) SHOWN`;
+
+  const container = document.getElementById('chk-results');
+  if (!visible.length && checkerIssues.length > 0) {
+    container.innerHTML = '<div class="chk-empty"><div class="big">✅</div><p>NO ISSUES MATCH CURRENT FILTERS</p></div>';
+    return;
+  }
+  if (!visible.length) {
+    container.innerHTML = '<div class="chk-empty"><div class="big">✅ ALL CLEAR</div><p>NO ISSUES FOUND IN DATABASE — RECORDS LOOK GOOD!</p></div>';
+    return;
+  }
+
+  const groups = [
+    { key:'duplicate', label:'🔁 DUPLICATE RECORDS',          color:'var(--pink)' },
+    { key:'missing',   label:'⚠ MISSING / EMPTY FIELDS',      color:'var(--orange)' },
+    { key:'format',    label:'📐 LENGTH & FORMAT ISSUES',      color:'var(--red)' },
+    { key:'pincode',   label:'📮 PINCODE MISMATCHES',          color:'var(--blue)' },
+    { key:'spelling',  label:'✏ SPELLING & CASING ISSUES',    color:'#9b59b6' },
+  ];
+
+  let html = '';
+  for (const g of groups) {
+    const items = visible.filter(i => i.type === g.key);
+    if (!items.length) continue;
+    html += `
+      <div class="chk-issue-group">
+        <div class="chk-group-head" style="border-top:4px solid ${g.color};">
+          <span>${g.label}</span>
+          <span class="gc">${items.length}</span>
+        </div>
+        <table class="chk-table">
+          <thead><tr>
+            <th>RECORD</th><th>ID / CODE</th><th>ISSUE</th><th>DETAILS</th><th>ACTION</th>
+          </tr></thead><tbody>`;
+
+    for (const issue of items) {
+      const r = issue.record;
+      const name = [r.sevakName, r.surName].filter(Boolean).join(' ') || '—';
+      const fixKey = r.id + '_' + issue.type + '_' + (issue.label||'');
+      const isFixed = checkerFixed.has(fixKey);
+      const badgeClass = { missing:'ib-missing', duplicate:'ib-dup', pincode:'ib-pin', format:'ib-format', spelling:'ib-spelling' }[issue.type] || 'ib-missing';
+
+      // severity badge
+      const sevMap = { high:'🔴 HIGH', medium:'🟡 MED', low:'🟢 LOW' };
+      const sevHtml = `<span style="font-family:'Space Mono',monospace;font-size:9px;color:#888;">${sevMap[issue.severity]||''}</span>`;
+
+      let detailHtml = `<span class="fix-val">${escHtml(issue.detail)}</span>`;
+      if (issue.fixes?.length) {
+        detailHtml = issue.fixes.map(f =>
+          f.fill
+            ? `<div class="fix-val">AUTO-FILL <span class="nw">${escHtml(f.fieldLabel)}: ${escHtml(f.correct)}</span></div>`
+            : `<div class="fix-val">${escHtml(f.fieldLabel)}: <span class="old">${escHtml(f.current)}</span> → <span class="nw">${escHtml(f.correct)}</span></div>`
+        ).join('');
+      }
+      if (issue.dupeWith?.length) {
+        const others = issue.dupeWith.slice(0,4).map(d=>[d.sevakName,d.surName].filter(Boolean).join(' ')||d.idNumber||'#'+d.id).join(', ');
+        detailHtml += `<div style="margin-top:4px;font-family:'Space Mono',monospace;font-size:9px;color:#888;">ALSO: ${escHtml(others)}${issue.dupeWith.length>4?' + more':''}</div>`;
+      }
+
+      let actionHtml = '';
+      if (!isFixed) {
+        actionHtml += `<button class="nb nb-yellow nb-sm" style="margin-bottom:3px;" onclick="openCheckerEdit(${r.id})">✎ EDIT</button><br>`;
+        if (issue.autofix && issue.fixes?.length) {
+          const fixData = JSON.stringify(issue.fixes.filter(f => f.correct));
+          actionHtml += `<button class="nb nb-green nb-sm" style="margin-bottom:3px;" onclick="applyCheckerFix(${r.id}, '${escHtml(fixData.replace(/'/g,"&apos;"))}', '${fixKey}')">⚡ FIX</button><br>`;
+        }
+        if (issue.type === 'duplicate') {
+          actionHtml += `<button class="nb nb-red nb-sm" onclick="checkerDeleteRecord(${r.id}, '${fixKey}')">✕ DEL</button>`;
+        }
+      } else {
+        actionHtml = '<span style="color:var(--green);font-family:\'Space Mono\',monospace;font-size:10px;">✅ FIXED</span>';
+      }
+
+      html += `<tr class="${isFixed?'issue-fixed':''}" id="chk-row-${fixKey.replace(/[^a-z0-9]/gi,'_')}">
+        <td><strong>${escHtml(name)}</strong><br><span style="font-size:11px;color:#888;">${escHtml(r.state||'')}${r.district?' · '+escHtml(r.district):''}</span></td>
+        <td><span class="id-tag">${escHtml(r.idNumber||'—')}</span><br><span style="font-size:11px;color:#888;font-family:'Space Mono',monospace;">${escHtml(r.code||'')}</span></td>
+        <td><span class="issue-badge ${badgeClass}">${escHtml(issue.label)}</span><br>${sevHtml}</td>
+        <td>${detailHtml}</td>
+        <td style="white-space:nowrap;">${actionHtml}</td>
+      </tr>`;
+    }
+    html += '</tbody></table></div>';
+  }
+  container.innerHTML = html;
+  document.getElementById('chk-empty-state').style.display = 'none';
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+async function applyCheckerFix(recordId, fixDataJson, fixKey) {
+  if (!SB_URL) { toast('CONNECT FIRST', 'err'); return; }
+  let fixes;
+  try { fixes = JSON.parse(fixDataJson.replace(/&apos;/g, "'")); } catch(e) { toast('FIX DATA ERROR', 'err'); return; }
+
+  const patch = {};
+  fixes.forEach(f => { if (f.correct) patch[f.field] = f.correct; });
+  if (!Object.keys(patch).length) return;
+
+  try {
+    await supa(`${TABLE}?id=eq.${recordId}`, { method: 'PATCH', body: JSON.stringify(patch) });
+    // update in-memory record
+    const rec = allRecords.find(r => r.id === recordId);
+    if (rec) Object.assign(rec, patch);
+    checkerFixed.add(fixKey);
+    toast('✅ RECORD UPDATED', 'ok');
+    updateCheckerStats();
+    renderCheckerResults();
+  } catch(e) {
+    toast('FIX FAILED: ' + e.message, 'err');
+  }
+}
+
+async function checkerDeleteRecord(recordId, fixKey) {
+  if (!SB_URL) { toast('CONNECT FIRST', 'err'); return; }
+  const rec = allRecords.find(r => r.id === recordId);
+  const name = rec ? ([rec.sevakName, rec.surName].filter(Boolean).join(' ') || rec.idNumber || 'this record') : 'this record';
+  if (!confirm(`Delete ${name} permanently? This cannot be undone.`)) return;
+  try {
+    await supa(`${TABLE}?id=eq.${recordId}`, { method: 'DELETE' });
+    allRecords = allRecords.filter(r => r.id !== recordId);
+    checkerIssues = checkerIssues.filter(i => i.record.id !== recordId);
+    toast('RECORD DELETED', 'ok');
+    updateCheckerStats();
+    renderCheckerResults();
+    updateStats(); applyFilters();
+  } catch(e) {
+    toast('DELETE FAILED: ' + e.message, 'err');
+  }
+}
+
+function openCheckerEdit(recordId) {
+  const rec = allRecords.find(r => r.id === recordId);
+  if (!rec) { toast('RECORD NOT FOUND', 'err'); return; }
+  activeRecord = rec;
+  editRowId = rec.id;
+  document.getElementById('m-verb').textContent = 'EDIT';
+  const fields = ['idNumber','code','sevakName','surName','fatherOrSpouseName','dob','mobileNo','email','state','district','city','street','doorNo','pincode'];
+  fields.forEach(f => { const el = document.getElementById('f-'+f); if(el) el.value = rec[f]||''; });
+  const gs = document.getElementById('f-gender');
+  if(gs) gs.value = rec.gender||'';
+  mNewPhoto = '';
+  const thumb = document.getElementById('m-photo-thumb');
+  if (rec.photoBase64) {
+    const src = rec.photoBase64.startsWith('data:') ? rec.photoBase64 : 'data:image/jpeg;base64,' + rec.photoBase64;
+    thumb.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover;" />`;
+  } else {
+    thumb.textContent = '📷';
+  }
+  document.getElementById('pin-verify-bar-modal').className = 'pin-verify-bar';
+  document.getElementById('form-overlay').classList.add('open');
+}
+
+async function fixAllIssues() {
+  if (!SB_URL) { toast('CONNECT FIRST', 'err'); return; }
+  const fixable = checkerIssues.filter(i => i.autofix && i.fixes?.length && !checkerFixed.has(i.record.id + '_' + i.type + '_' + (i.label||'')));
+  if (!fixable.length) { toast('NO AUTO-FIXABLE ISSUES', 'err'); return; }
+  if (!confirm(`Auto-fix ${fixable.length} issue(s) in the database? This will update the records.`)) return;
+
+  const btn = document.getElementById('btn-fix-all');
+  btn.disabled = true; btn.textContent = '⏳ FIXING…';
+  let done = 0, failed = 0;
+  for (const issue of fixable) {
+    const patch = {};
+    issue.fixes.forEach(f => { if (f.correct) patch[f.field] = f.correct; });
+    const fixKey = issue.record.id + '_' + issue.type + '_' + (issue.label||'');
+    try {
+      await supa(`${TABLE}?id=eq.${issue.record.id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+      const rec = allRecords.find(r => r.id === issue.record.id);
+      if (rec) Object.assign(rec, patch);
+      checkerFixed.add(fixKey);
+      done++;
+    } catch { failed++; }
+  }
+  toast(`FIX ALL: ${done} FIXED${failed ? ', ' + failed + ' FAILED' : ''}`, done > 0 ? 'ok' : 'err');
+  updateCheckerStats();
+  renderCheckerResults();
+  btn.disabled = false; btn.textContent = '⚡ FIX ALL AUTO-FIXABLE';
+}
 </script>
 </body>
 </html>
