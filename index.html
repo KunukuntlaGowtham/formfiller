@@ -1772,12 +1772,90 @@ td { border: none; }
 .d-section { margin-bottom: 18px; }
 .table-scroll { border-radius: 0 0 var(--r) var(--r); }
 
+
+/* ── minimal menu ──────────────────────────────────────────────── */
+/* Plain labels with a rule under the active one, rather than a row of
+   filled pills competing with the page for attention. */
+.brand {
+  border: none; background: transparent; cursor: pointer;
+  display: flex; align-items: center; padding: 0 4px 0 18px; gap: 0;
+}
+.brand-icon {
+  width: 34px; height: 34px; font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.hdr-table-slot { display: none; }
+
+.nav-tabs { gap: 2px; padding: 6px 8px; }
+.tab-btn {
+  background: transparent; border: none; border-radius: 0;
+  padding: 10px 13px; font-size: 13px; font-weight: 500;
+  color: var(--muted-strong); position: relative;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.tab-btn:hover { background: transparent; color: var(--ink); }
+.tab-btn.active {
+  background: transparent; color: var(--lav-700);
+  font-weight: 700; box-shadow: none;
+}
+:root[data-theme="dark"] .tab-btn.active { color: var(--lav-300); }
+.tab-btn.active::after {
+  content: ''; position: absolute; left: 13px; right: 13px; bottom: 4px;
+  height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--lav-500), var(--pink));
+}
+.tab-count {
+  background: transparent; color: var(--muted-2);
+  font-size: 11px; padding: 0; font-weight: 600;
+}
+.tab-btn.active .tab-count { background: transparent; color: var(--lav-500); }
+/* Emoji in a minimal menu is noise; the words carry it. */
+.tab-btn { font-feature-settings: normal; }
+
+.nav-right { gap: 6px; padding-right: 16px; }
+.nav-ico {
+  position: relative; width: 34px; height: 34px; border-radius: 10px;
+  border: 1px solid transparent; background: transparent; cursor: pointer;
+  color: var(--muted-strong); font-size: 14px;
+}
+.nav-ico:hover, .nav-ico.on { background: rgba(255,255,255,.5); color: var(--ink); }
+:root[data-theme="dark"] .nav-ico:hover, :root[data-theme="dark"] .nav-ico.on { background: rgba(255,255,255,.08); }
+.conn-dot {
+  position: absolute; right: 5px; bottom: 5px; width: 7px; height: 7px;
+  border-radius: 50%; background: var(--muted-3);
+  box-shadow: 0 0 0 2px var(--white);
+}
+.conn-dot.ok   { background: var(--green); }
+.conn-dot.bad  { background: var(--red); }
+.conn-dot.busy { background: var(--yellow); }
+
+#cfg-bar.hidden { display: none; }
+
+
+/* The checker's count only earns colour when it is not zero. */
+.tab-count.issues { color: var(--muted-2); }
+.tab-count.issues:not(:empty) { color: var(--red); font-weight: 700; }
+.nav-right .nb { font-weight: 500; letter-spacing: .2px; }
+
+
+/* An in-cell dropdown should read as the value it holds until you reach for
+   it, not as a control shouting in every row. */
+.cell-sel {
+  border: 1px solid transparent; border-radius: 9px;
+  background: transparent; color: var(--ink);
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+  padding: 5px 7px; max-width: 100%; cursor: pointer;
+}
+.cell-sel:hover { background: rgba(255,255,255,.55); border-color: var(--line); }
+:root[data-theme="dark"] .cell-sel:hover { background: rgba(255,255,255,.08); }
+.cell-sel:focus { background: rgba(255,255,255,.8); border-color: var(--lav-500); outline: none; }
+
 </style>
 </head>
 <body>
 
 <!-- ═══ CONFIG BAR ═══ -->
-<div id="cfg-bar">
+<div id="cfg-bar" class="hidden">
   <label for="cfg-url">Supabase URL</label>
   <input class="cfg-input" id="cfg-url" value="https://qzzcpuvcrhbasnnsfvgt.supabase.co" placeholder="https://xxxx.supabase.co" />
   <label for="cfg-key">Anon Key</label>
@@ -1792,42 +1870,41 @@ td { border: none; }
 
 <!-- ═══ TOP NAV ═══ -->
 <nav class="top-nav">
-  <div class="brand">
-    <div class="brand-icon" aria-hidden="true">⚡</div>
-    <div>
-      <div class="brand-name">SEVAK REGISTRY</div>
-      <div class="brand-table">TABLE: <strong id="hdr-table">customers</strong></div>
-    </div>
-  </div>
+  <button class="brand" onclick="switchTab('list')" title="Records">
+    <span class="brand-icon" aria-hidden="true">⚡</span>
+    <span class="hdr-table-slot" hidden>TABLE: <strong id="hdr-table">customers</strong></span>
+  </button>
   <div class="nav-tabs">
     <button class="tab-btn active" data-tab="list" onclick="switchTab('list')">
-      📋 RECORDS <span class="tab-count" id="tc-records">0</span>
+      Records <span class="tab-count" id="tc-records">0</span>
     </button>
     <button class="tab-btn" data-tab="register" onclick="switchTab('register')">
-      ✚ REGISTER NEW
+      Register
     </button>
     <button class="tab-btn" data-tab="fast" onclick="switchTab('fast')">
-      ⌨ FAST ENTRY
+      Fast Entry
     </button>
     <button class="tab-btn" data-tab="teams" onclick="switchTab('teams')">
-      🏅 TEAMS <span class="tab-count" id="tc-teams">0</span>
+      Teams <span class="tab-count" id="tc-teams">0</span>
     </button>
     <button class="tab-btn" data-tab="staff" onclick="switchTab('staff')">
-      👤 STAFF <span class="tab-count" id="tc-staff">0</span>
+      Staff <span class="tab-count" id="tc-staff">0</span>
     </button>
     <button class="tab-btn" data-tab="month" onclick="switchTab('month')">
-      📅 MONTH
+      Month
     </button>
     <button class="tab-btn" data-tab="checker" onclick="switchTab('checker')">
-      🔍 DATA CHECKER <span class="tab-count" id="tc-issues" style="background:var(--red);color:#fff;">0</span>
+      Checker <span class="tab-count issues" id="tc-issues">0</span>
     </button>
   </div>
   <div class="nav-right">
-    <button class="nb nb-ghost nb-sm" onclick="openCmdk()" title="Command palette (Ctrl+K)">⌘ SEARCH</button>
+    <button class="nav-ico" onclick="toggleCfgBar()" id="btn-cfg"
+            title="Connection settings">⚙<span class="conn-dot" id="conn-dot"></span></button>
+    <button class="nb nb-ghost nb-sm" onclick="openCmdk()" title="Command palette (Ctrl+K)">Search</button>
     <button class="nb nb-ghost nb-sm" id="btn-theme" onclick="cycleTheme()" title="Light / dark / follow system">◐</button>
-    <button class="nb nb-ghost nb-sm" onclick="openTrash()" title="Recently deleted records">🗑 BIN<span id="trash-count" style="display:none;">0</span></button>
-    <button class="nb nb-black nb-sm" id="btn-ai-toggle">✦ AI FILTER</button>
-    <button class="nb nb-pink nb-sm" onclick="openAdd()">＋ ADD</button>
+    <button class="nb nb-ghost nb-sm" onclick="openTrash()" title="Recently deleted records">Bin<span id="trash-count" style="display:none;">0</span></button>
+    <button class="nb nb-black nb-sm" id="btn-ai-toggle">Ask AI</button>
+    <button class="nb nb-pink nb-sm" onclick="openAdd()">+ Add</button>
   </div>
 </nav>
 
@@ -9083,6 +9160,61 @@ function staffMonthConflict(staffId, group, key){
   return { group: clash.group, name: t ? t.name : clash.group, open: !clash.to };
 }
 
+// Changing who books a team, or which team somebody books, is a move: the
+// seat being left closes as the new one opens. Doing it as an add would trip
+// the one-team-a-month rule against the very team they are leaving.
+async function setStaffTeam(staffId, group){
+  const s = staffById(staffId);
+  if (!s) return;
+  const current = currentTeamsOf(staffId)[0] || '';
+  if (current === group){ renderStaff(); return; }
+
+  const clash = staffMonthConflict(staffId, group);
+  if (clash && !(clash.open && clash.group === current)){
+    toast(`${s.name.toUpperCase()} ALREADY HAD ${clash.name.toUpperCase()} THIS MONTH`,'err');
+    alert(`${s.name} was already on ${clash.name} in ${monthLabel(thisMonthKey())}.\n\nOne team per person per month — move them next month instead.`);
+    refreshBookingViews();
+    return;
+  }
+  if (current && group && new Date().getDate() !== 1 &&
+      !confirm(`${s.name} moves off ${buildTeams().find(t=>t.code===current)?.name || current} onto ${
+        buildTeams().find(t=>t.code===group)?.name || group} today.\n\nThat leaves them holding two teams in ${
+        monthLabel(thisMonthKey())}. Continue?`)) { refreshBookingViews(); return; }
+
+  const now = new Date().toISOString();
+  staffAssignments.forEach(a => {
+    if (!a.to && (String(a.staffId) === String(staffId) || a.group === group)) a.to = now;
+  });
+  if (group) staffAssignments.push({ id: newAssignmentId(), staffId, group, from: now, to: null });
+  await idbSet('staffSavedAt', now);
+  await persistStaff();
+  const tn = group ? (buildTeams().find(t => t.code === group)?.name || group) : null;
+  toast(tn ? `${s.name.toUpperCase()} → ${tn.toUpperCase()}` : `${s.name.toUpperCase()} HAS NO TEAM`, 'ok');
+  refreshBookingViews();
+}
+
+// Same move from the team's side, which is how the month view edits it.
+async function setTeamStaff(group, staffId){
+  if (!staffId){
+    const open = openAssignments().find(a => a.group === group);
+    if (!open) return;
+    open.to = new Date().toISOString();
+    await idbSet('staffSavedAt', open.to);
+    await persistStaff();
+    toast(`${group.toUpperCase()} UNASSIGNED`, 'inf');
+    refreshBookingViews();
+    return;
+  }
+  await setStaffTeam(staffId, group);
+}
+
+function refreshBookingViews(){
+  cancelStaffEdit();
+  if (document.getElementById('pg-staff')?.classList.contains('active')) renderStaff();
+  if (document.getElementById('pg-month')?.classList.contains('active')) renderMonth();
+  if (document.getElementById('pg-teams')?.classList.contains('active')) renderTeams();
+}
+
 async function assignTeamTo(group, staffId, quiet){
   const clash = staffMonthConflict(staffId, group);
   if (clash){
@@ -9191,20 +9323,25 @@ function renderStaff(){
     </tr></thead><tbody>` +
     shown.map(({ staff: s, teams, members, month, everGroups }) => {
       const t = teams[0], L = t?.leader;
-      const teamCell = teams.length
-        ? teams.map(x => {
-            const a = openAssignments().find(o => o.group === x.code);
-            return `<span class="tm-code" style="cursor:pointer" onclick="setGroupFilter('${escAttr(x.code)}')" title="Show this team's records">${escHtml(x.name)}</span>` +
-              (a ? `<div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">since ${escHtml(fmtCreated(new Date(a.from)))}</div>` : '');
-          }).join(' ')
-        : `<select class="nb-select nb-sm" onchange="assignTeamTo(this.value, '${escAttr(s.id)}')" aria-label="Assign a team to ${escAttr(s.name)}">
-             <option value="">— pick a team —</option>
-             ${allTeams.filter(x => !staffOfTeam(x.code)).map(x => {
-               const c = staffMonthConflict(s.id, x.code);
-               return `<option value="${escAttr(x.code)}"${c?' disabled':''}>${
-                 escHtml(`${x.name} (${x.members.length})` + (c ? ` — ${c.name} already this month` : ''))}</option>`;
-             }).join('')}
-           </select>`;
+      const mine = teams[0]?.code || '';
+      const openA = mine ? openAssignments().find(o => o.group === mine) : null;
+      const teamCell = `<select class="cell-sel" onchange="setStaffTeam('${escAttr(s.id)}', this.value)"
+                                aria-label="Team booked by ${escAttr(s.name)}">
+          <option value=""${mine?'':' selected'}>— no team —</option>
+          ${allTeams.map(x => {
+            const isMine = x.code === mine;
+            const held = isMine ? null : staffOfTeam(x.code);
+            let c = isMine ? null : staffMonthConflict(s.id, x.code);
+            // The team they currently hold is the seat they would vacate by
+            // moving, not a clash — only a team already given up this month is.
+            if (c && c.open && c.group === mine) c = null;
+            return `<option value="${escAttr(x.code)}"${isMine?' selected':''}${c?' disabled':''}>${
+              escHtml(`${x.name} (${x.members.length})`
+                + (held ? ` — with ${held.name}` : '')
+                + (c ? ` · had ${c.name} this month` : ''))}</option>`;
+          }).join('')}
+        </select>` +
+        (openA ? `<div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);margin-top:3px;">since ${escHtml(fmtCreated(new Date(openA.from)))}</div>` : '');
       return `<tr>
         <td><strong>${escHtml(s.name)}</strong></td>
         <td style="font-family:'Space Mono',monospace;font-size:12px;">${
@@ -10158,6 +10295,9 @@ function renderMonth(){
 
   // ── booked: every assignment that overlapped this month, so a team handed
   //    over mid-month shows both the people who held it.
+  // Only the month in progress can be edited here. Rewriting who booked a team
+  // in a month that has closed would quietly rewrite a report already sent.
+  const editable = key === thisMonthKey();
   const booked = assignmentsInRange(from, to).map(a => ({
     a, staff: staffById(a.staffId), team: byCode[a.group]
   })).filter(x => x.team);
@@ -10186,12 +10326,29 @@ function renderMonth(){
 
   // ── panel 1 — teams to book
   const bookedRows = booked.length ? booked.map(x => {
-    const got = (enteredBy[x.team.code] || []).length;
+    // Count inside this holder's own window, not the team's month total —
+    // a team handed over mid-month would otherwise credit both people with
+    // everyone, and the column would not add up to the month.
+    const winFrom = x.a.from > from ? x.a.from : from;
+    const winTo   = (x.a.to && x.a.to < to) ? x.a.to : to;
+    const got = dated ? countInWindow(x.team.members, winFrom, winTo) : 0;
     const L = x.team.leader;
     return `<tr>
       <td><strong>${escHtml(x.team.name)}</strong>
         <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">${escHtml(x.team.range)}</div></td>
-      <td>${x.staff ? escHtml(x.staff.name) : '<span style="color:var(--muted)">— removed —</span>'}
+      <td>${editable
+        ? `<select class="cell-sel" onchange="setTeamStaff('${escAttr(x.team.code)}', this.value)"
+                   aria-label="Who books ${escAttr(x.team.name)}">
+             <option value="">— nobody —</option>
+             ${staffList.map(st => {
+               const isMine = String(st.id) === String(x.a.staffId);
+               let c = isMine ? null : staffMonthConflict(st.id, x.team.code);
+               if (c && c.open && c.group === (currentTeamsOf(st.id)[0] || '')) c = null;
+               return `<option value="${escAttr(st.id)}"${isMine?' selected':''}${c?' disabled':''}>${
+                 escHtml(st.name + (c ? ` — has ${c.name}` : ''))}</option>`;
+             }).join('')}
+           </select>`
+        : (x.staff ? escHtml(x.staff.name) : '<span style="color:var(--muted)">— removed —</span>')}
         ${x.staff?.mobile ? `<div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">${escHtml(x.staff.mobile)}</div>` : ''}</td>
       <td>${L ? escHtml(fullName(L)) : '—'}
         ${L?.mobileNo ? `<div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">${escHtml(L.mobileNo)}</div>` : ''}</td>
@@ -10253,7 +10410,7 @@ function renderMonth(){
 
   body.innerHTML =
     panel('📖 TEAMS TO BOOK IN ' + monthLabel(key).toUpperCase(),
-      `${bookedCodes.size} team${bookedCodes.size===1?'':'s'}`,
+      `${bookedCodes.size} team${bookedCodes.size===1?'':'s'}` + (editable ? ' · editable' : ' · past month, read only'),
       `<div class="table-scroll"><table><thead><tr>
          <th>TEAM</th><th>BOOKED BY</th><th>TEAM LEADER</th><th>HELD</th>
          <th style="text-align:right">MEMBERS</th><th style="text-align:right">IN THIS MONTH</th>
@@ -10285,6 +10442,36 @@ function renderMonth(){
     panel('⚡ LAST SEVEN DAYS', dated ? `${weekTotal} registered` : 'needs a created_at column',
       `<div style="padding:16px 18px;display:flex;gap:10px;align-items:flex-end;">${weekBars}</div>`);
 }
+
+// ════════════════════════════════════════════
+// CONNECTION BAR — out of the way
+// ════════════════════════════════════════════
+// The URL, key and table are part of the build now, so the bar that held
+// them is noise on every screen and puts the key on show. It is folded away
+// behind a dot in the nav that reports the connection, and opens when there
+// is a reason to touch it.
+
+function toggleCfgBar(){
+  const bar = document.getElementById('cfg-bar');
+  const open = bar.classList.toggle('hidden');
+  document.getElementById('btn-cfg').classList.toggle('on', !open);
+  if (!open) document.getElementById('cfg-table')?.focus();
+}
+
+// Mirror the connection status onto the dot, so a failure is still visible
+// with the bar shut.
+function paintConnDot(){
+  const dot = document.getElementById('conn-dot');
+  const st  = document.getElementById('conn-status');
+  if (!dot || !st) return;
+  const t = st.textContent || '';
+  dot.className = 'conn-dot ' + (/✓/.test(t) ? 'ok' : /✗/.test(t) ? 'bad' : /⏳/.test(t) ? 'busy' : '');
+  document.getElementById('btn-cfg').title =
+    'Connection settings — ' + (t.replace(/\s+/g,' ').trim() || 'not connected');
+}
+new MutationObserver(paintConnDot).observe(
+  document.getElementById('conn-status'), { childList:true, characterData:true, subtree:true });
+paintConnDot();
 
 </script>
 </body>
