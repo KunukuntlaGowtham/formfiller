@@ -1366,9 +1366,9 @@ body.dense .av { width: 30px !important; height: 30px !important; }
 <!-- ═══ CONFIG BAR ═══ -->
 <div id="cfg-bar">
   <label for="cfg-url">Supabase URL</label>
-  <input class="cfg-input" id="cfg-url" placeholder="https://xxxx.supabase.co" />
+  <input class="cfg-input" id="cfg-url" value="https://qzzcpuvcrhbasnnsfvgt.supabase.co" placeholder="https://xxxx.supabase.co" />
   <label for="cfg-key">Anon Key</label>
-  <input class="cfg-input" id="cfg-key" type="password" placeholder="eyJ..." />
+  <input class="cfg-input" id="cfg-key" type="password" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6emNwdXZjcmhiYXNubnNmdmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1NDc2MTgsImV4cCI6MjA4NTEyMzYxOH0._MAMf4jVmNBarBLM1nSKdbjeq7lxRUjfQCnf5cxK4X8" placeholder="eyJ..." />
   <label for="cfg-table">Table</label>
   <input class="cfg-input" id="cfg-table" value="customers" placeholder="table name" />
   <label for="cfg-gemini">Gemini Key</label>
@@ -1398,6 +1398,9 @@ body.dense .av { width: 30px !important; height: 30px !important; }
     </button>
     <button class="tab-btn" data-tab="teams" onclick="switchTab('teams')">
       🏅 TEAMS <span class="tab-count" id="tc-teams">0</span>
+    </button>
+    <button class="tab-btn" data-tab="staff" onclick="switchTab('staff')">
+      👤 STAFF <span class="tab-count" id="tc-staff">0</span>
     </button>
     <button class="tab-btn" data-tab="stats" onclick="switchTab('stats')">
       📊 STATS
@@ -1908,6 +1911,68 @@ body.dense .av { width: 30px !important; height: 30px !important; }
   <div id="teams-body"></div>
 </div>
 
+<!-- ═══════════════════ PAGE: STAFF ═══════════════════ -->
+<div class="page" id="pg-staff">
+  <div class="chk-header">
+    <div>
+      <h2>STAFF &amp; BOOKINGS</h2>
+      <p>Each staff member coordinates a team. Assign the team once here — member counts, leader details and monthly
+         totals then follow from each person's code, with nothing to keep in step by hand.</p>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <div class="search-wrap" style="max-width:210px;">
+        <span class="ico" aria-hidden="true">⌕</span>
+        <input type="text" id="staff-search" placeholder="Search staff, team, leader…" aria-label="Search staff" oninput="renderStaff()" />
+      </div>
+      <button class="nb nb-red"   onclick="printStaffReport()"   title="Staff, their team, the team leader and member counts">📄 STAFF + TEAM PDF</button>
+      <button class="nb nb-blue"  onclick="printMonthlyReport()" title="Month by month, how many joined each team">📅 MONTHLY PDF</button>
+      <button class="nb nb-yellow" onclick="openRotation()" title="Give every staff member their team for the new month">🔄 NEW MONTH</button>
+      <select class="nb-select nb-sm" id="staff-year" aria-label="Year for the year-end report" title="Year to report on"></select>
+      <button class="nb nb-green" onclick="printYearReport()" title="Which teams each staff member handled that year, and for how long">🗓 YEAR-END PDF</button>
+      <span id="staff-cloud" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;letter-spacing:1px;"></span>
+      <button class="nb nb-ghost" onclick="exportStaffBackup()"  title="Save staff, team names and leaders to a file">⬇ BACKUP</button>
+      <button class="nb nb-ghost" onclick="document.getElementById('staff-restore-file').click()" title="Load a backup file">⬆ RESTORE</button>
+      <input type="file" id="staff-restore-file" accept="application/json" style="display:none" onchange="importStaffBackup(event)" aria-label="Restore staff backup" />
+    </div>
+  </div>
+
+  <div class="stats-strip" id="staff-strip" style="display:none;"></div>
+  <div id="staff-cloud-setup" style="display:none;"></div>
+
+  <div style="padding:0 24px 24px;">
+    <div class="d-section" style="margin-bottom:18px;">
+      <div class="d-head"><span id="staff-form-title">➕ ADD STAFF MEMBER</span></div>
+      <div style="padding:14px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+        <div class="fld" style="flex:1 1 180px;">
+          <label for="staff-name">Name <span class="req">*</span></label>
+          <input id="staff-name" placeholder="Staff member's name" />
+        </div>
+        <div class="fld" style="flex:0 1 150px;">
+          <label for="staff-mobile">Mobile</label>
+          <input id="staff-mobile" type="tel" maxlength="10" inputmode="numeric" placeholder="10 digits" />
+        </div>
+        <div class="fld" style="flex:0 1 150px;">
+          <label for="staff-role">Role</label>
+          <input id="staff-role" list="dl-staff-role" placeholder="Coordinator" />
+          <datalist id="dl-staff-role">
+            <option>Coordinator</option><option>Team In-charge</option>
+            <option>Volunteer</option><option>Supervisor</option>
+          </datalist>
+        </div>
+        <div class="fld" style="flex:0 1 190px;">
+          <label for="staff-team">Team they book</label>
+          <select id="staff-team"><option value="">— none yet —</option></select>
+        </div>
+        <button class="nb nb-yellow" id="staff-save-btn" onclick="saveStaffMember()">⚡ ADD STAFF</button>
+        <button class="nb nb-ghost" id="staff-cancel-btn" style="display:none" onclick="cancelStaffEdit()">CANCEL</button>
+      </div>
+    </div>
+
+    <div id="staff-body"></div>
+    <div id="staff-unassigned" style="margin-top:18px;"></div>
+  </div>
+</div>
+
 <!-- ═══════════════════ PAGE: STATS ═══════════════════ -->
 <div class="page" id="pg-stats">
   <div class="chk-header">
@@ -2115,6 +2180,24 @@ body.dense .av { width: 30px !important; height: 30px !important; }
     <div class="modal-footer">
       <button class="nb nb-ghost" onclick="closeReassignModal()">CANCEL</button>
       <button class="nb nb-green" id="reassign-btn" onclick="runReassign()">🏷 APPLY TO ALL</button>
+    </div>
+  </div>
+</div>
+
+<!-- MONTHLY ROTATION -->
+<div class="overlay" id="rotate-overlay">
+  <div class="modal" style="max-width:620px;" role="dialog" aria-modal="true" aria-label="Monthly rotation">
+    <button class="btn-x" onclick="closeRotation()" title="Close" aria-label="Close">✕</button>
+    <div class="modal-title">🔄 NEW MONTH <span class="hi">ROTATION</span></div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.7;">
+      Give each staff member the team they take from today. Whatever they held before is closed off
+      with today's date and kept in the history — the year-end report still shows it.
+    </p>
+    <div id="rotate-rows" style="max-height:44vh;overflow-y:auto;margin-bottom:14px;"></div>
+    <div id="rotate-warn" style="font-family:'Space Mono',monospace;font-size:11px;min-height:18px;margin-bottom:10px;"></div>
+    <div class="modal-footer">
+      <button class="nb nb-ghost" onclick="closeRotation()">CANCEL</button>
+      <button class="nb nb-green" id="rotate-btn" onclick="applyRotation()">🔄 APPLY ROTATION</button>
     </div>
   </div>
 </div>
@@ -2556,11 +2639,12 @@ function switchTab(tab) {
   const showSearch = tab==='list';
   document.getElementById('search-bar').style.display = showSearch?'':'none';
   document.getElementById('ai-drawer').classList.remove('open');
-  const pg = {list:'pg-list',detail:'pg-detail',register:'pg-register',bulk:'pg-bulk',checker:'pg-checker',stats:'pg-stats',teams:'pg-teams'}[tab];
+  const pg = {list:'pg-list',detail:'pg-detail',register:'pg-register',bulk:'pg-bulk',checker:'pg-checker',stats:'pg-stats',teams:'pg-teams',staff:'pg-staff'}[tab];
   if(pg) document.getElementById(pg).classList.add('active');
   if(tab==='bulk') { measureChrome(); checkForDraft(); }
   if(tab==='stats') renderStats();
   if(tab==='teams') renderTeams();
+  if(tab==='staff') renderStaff();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -2670,6 +2754,7 @@ async function connect() {
     st.textContent='✓ connected'; st.style.color='#00C16A';
     showColumnStatus();          // must run AFTER the status text is set, or it gets wiped
     toast('CONNECTED TO SUPABASE','ok');
+    if (typeof staffAfterConnect === 'function') staffAfterConnect();
   } catch(e) {
     st.textContent='✗ failed'; st.style.color='#E63030';
     toast('CONNECT FAILED: '+e.message,'err');
@@ -8725,6 +8810,14 @@ document.addEventListener('keydown', e => {
 // ════════════════════════════════════════════
 loadTheme();
 loadDensity();
+// The connection is baked into the config bar above. Connect on load so the
+// registry is there when the page opens; the fields stay editable for anyone
+// who needs to point at a different project or table.
+(function autoConnect(){
+  const url = document.getElementById('cfg-url')?.value.trim();
+  const key = document.getElementById('cfg-key')?.value.trim();
+  if (url && key) connect();
+})();
 measureChrome();
 bkRenderSidebar();
 populateStateSelects();   // the dropdown must work before anyone connects
@@ -9136,6 +9229,785 @@ async function runLocalScan(kind){
   initAiEditor  = wrap('ai',  pageSets.ai.load);
   initDocEditor = wrap('doc', pageSets.doc.load);
 })();
+
+
+// ════════════════════════════════════════════
+// STAFF & BOOKINGS
+// ════════════════════════════════════════════
+// Registration is done centrally; staff coordinate. One staff member looks
+// after a team, so who a person "belongs to" is never typed — it falls out of
+// their code. Assign the team once and counts, leader details and monthly
+// totals follow, with nothing to keep in step by hand.
+//
+// Assignments are kept as HISTORY, not as a current value: every hand-over is
+// a row with a start and an end. That is what makes "which teams did each
+// staff member handle in 2026" answerable a year later — overwriting a single
+// field would have thrown that away the first time a team changed hands.
+//
+// Storage: IndexedDB always, and the Supabase app_settings table when it
+// exists, so the record survives a cleared browser or a second device.
+
+let staffList        = [];   // [{ id, name, mobile, role }]
+let staffAssignments = [];   // [{ id, staffId, group, from, to|null }]
+let staffEditId      = null;
+let staffCloud       = false;
+
+const CLOUD_TABLE = 'app_settings';
+const CLOUD_KEY   = 'sevak_staff';
+
+// ── storage ──────────────────────────────────────────────────────
+async function loadStaff(){
+  staffList        = (await idbGet('staffList'))        || [];
+  staffAssignments = (await idbGet('staffAssignments')) || [];
+  // Upgrade the older shape (one live map, no history) without losing it.
+  const legacy = await idbGet('staffTeams');
+  if (legacy && !staffAssignments.length){
+    staffAssignments = Object.entries(legacy).map(([group, staffId]) => ({
+      id: newAssignmentId(), staffId, group, from: new Date().toISOString(), to: null
+    }));
+    await idbSet('staffAssignments', staffAssignments);
+  }
+  updateStaffBadge();
+}
+
+function newAssignmentId(){
+  return 'as' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+}
+
+async function persistStaff(){
+  await idbSet('staffList', staffList);
+  await idbSet('staffAssignments', staffAssignments);
+  updateStaffBadge();
+  staffCloudSave();
+}
+
+function updateStaffBadge(){
+  const el = document.getElementById('tc-staff');
+  if (el) el.textContent = staffList.length;
+}
+
+// The cloud copy is one row of JSON, so there is nothing to migrate and no
+// second schema to keep in step. Missing table simply means local-only.
+async function staffCloudLoad(){
+  if (!SB_URL) return null;
+  try {
+    const rows = await supa(`${CLOUD_TABLE}?key=eq.${CLOUD_KEY}&select=value`);
+    staffCloud = true;
+    return (Array.isArray(rows) && rows[0]) ? rows[0].value : null;
+  } catch(_){ staffCloud = false; return null; }
+}
+
+async function staffCloudSave(){
+  if (!staffCloud || !SB_URL) return;
+  try {
+    await supa(`${CLOUD_TABLE}?on_conflict=key`, {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ key: CLOUD_KEY, value: {
+        staffList, staffAssignments, savedAt: new Date().toISOString()
+      }})
+    });
+  } catch(e){ toast('CLOUD SAVE FAILED: '+e.message, 'err'); }
+}
+
+// The SQL that makes the table exist. Shown in the app rather than left in a
+// chat message, because this is the step between "saved on one phone" and
+// "still here next year".
+const CLOUD_SQL = `create table if not exists ${CLOUD_TABLE} (
+  key        text primary key,
+  value      jsonb,
+  updated_at timestamptz default now()
+);
+alter table ${CLOUD_TABLE} enable row level security;
+create policy "anon read"  on ${CLOUD_TABLE} for select using (true);
+create policy "anon write" on ${CLOUD_TABLE} for all    using (true) with check (true);`;
+
+function renderCloudSetup(){
+  const box = document.getElementById('staff-cloud-setup');
+  if (!box) return;
+  if (staffCloud){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = '';
+  box.innerHTML = `<div style="margin:0 24px 18px;border:3px solid var(--orange);background:var(--surface-2);">
+    <div style="background:var(--orange);color:#111;padding:8px 14px;font-family:'Space Mono',monospace;
+                font-size:11px;font-weight:700;letter-spacing:1.5px;">
+      ⚠ SAVED ON THIS DEVICE ONLY — ONE STEP TO FIX IT</div>
+    <div style="padding:14px;">
+      <p style="font-size:13px;line-height:1.7;margin-bottom:10px;">
+        The staff list and its history have nowhere to live in your table, so right now they exist only in
+        this browser. Paste this into the Supabase <strong>SQL editor</strong> and press Run — then come back
+        and press Re-check. Nothing else changes, and your registry table is untouched.</p>
+      <pre id="cloud-sql" style="background:var(--chrome);color:#7CFFB2;padding:12px;overflow-x:auto;
+           font-family:'Space Mono',monospace;font-size:11px;line-height:1.6;border:var(--b2);">${escHtml(CLOUD_SQL)}</pre>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+        <button class="nb nb-black nb-sm" onclick="copyCloudSql()">📋 COPY SQL</button>
+        <button class="nb nb-green nb-sm" onclick="recheckCloud()">↻ RE-CHECK</button>
+        <span id="cloud-recheck-status" style="font-family:'Space Mono',monospace;font-size:11px;align-self:center;"></span>
+      </div>
+    </div></div>`;
+}
+
+function copyCloudSql(){
+  navigator.clipboard.writeText(CLOUD_SQL)
+    .then(() => toast('SQL COPIED — PASTE IT IN THE SUPABASE SQL EDITOR','ok'))
+    .catch(() => {
+      // Clipboard is blocked in some embedded browsers; select it instead so
+      // the operator can still copy by hand.
+      const r = document.createRange();
+      r.selectNodeContents(document.getElementById('cloud-sql'));
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      toast('SELECTED — PRESS CTRL+C','inf');
+    });
+}
+
+async function recheckCloud(){
+  const st = document.getElementById('cloud-recheck-status');
+  if (st) st.textContent = 'checking…';
+  await staffAfterConnect();
+  if (staffCloud){
+    await staffCloudSave();
+    toast('CONNECTED — STAFF NOW SAVED TO SUPABASE','ok');
+  } else if (st){
+    st.textContent = 'still not there — run the SQL above first';
+    st.style.color = 'var(--red)';
+  }
+  renderStaff();
+}
+
+// Called once a connection is up. The newer of the two copies wins; a tie or
+// an unreachable table leaves the device's own copy alone.
+async function staffAfterConnect(){
+  const cloud = await staffCloudLoad();
+  if (cloud && Array.isArray(cloud.staffList)){
+    const mine = (await idbGet('staffSavedAt')) || '';
+    if (!mine || (cloud.savedAt || '') > mine){
+      staffList        = cloud.staffList || [];
+      staffAssignments = cloud.staffAssignments || [];
+      await idbSet('staffList', staffList);
+      await idbSet('staffAssignments', staffAssignments);
+      await idbSet('staffSavedAt', cloud.savedAt || new Date().toISOString());
+      updateStaffBadge();
+    }
+  } else if (staffCloud && staffList.length){
+    staffCloudSave();                       // table exists but is empty — seed it
+  }
+  if (document.getElementById('pg-staff')?.classList.contains('active')) renderStaff();
+}
+
+// ── lookups ──────────────────────────────────────────────────────
+const staffById = id => staffList.find(s => String(s.id) === String(id)) || null;
+const openAssignments = () => staffAssignments.filter(a => !a.to);
+
+function staffOfTeam(group){
+  const a = openAssignments().find(x => x.group === group);
+  return a ? staffById(a.staffId) : null;
+}
+function currentTeamsOf(staffId){
+  return openAssignments().filter(a => String(a.staffId) === String(staffId)).map(a => a.group);
+}
+
+// Assignments touching a window — how "teams handled during 2026" is answered.
+function assignmentsInRange(fromISO, toISO){
+  return staffAssignments.filter(a => {
+    const start = a.from || '';
+    const end   = a.to || '9999';
+    return start <= toISO && end >= fromISO;
+  });
+}
+function yearsCovered(){
+  const ys = new Set([String(new Date().getFullYear())]);
+  staffAssignments.forEach(a => {
+    if (a.from) ys.add(a.from.slice(0,4));
+    if (a.to)   ys.add(a.to.slice(0,4));
+  });
+  allRecords.forEach(r => { const d = createdOf(r); if (d) ys.add(String(d.getFullYear())); });
+  return [...ys].sort().reverse();
+}
+
+// ── months ───────────────────────────────────────────────────────
+// Monthly totals need a registration date. Row ids give order, never dates,
+// so without a created_at column the reports say so rather than invent one.
+function monthOf(r){ const d = createdOf(r); return d ? monthKey(d) : null; }
+function monthsPresent(){
+  const set = new Set();
+  allRecords.forEach(r => { const k = monthOf(r); if (k) set.add(k); });
+  return [...set].sort().reverse();
+}
+const countInMonth = (members, key) => members.filter(r => monthOf(r) === key).length;
+const thisMonthKey = () => monthKey(new Date());
+
+// Members registered while this staff member actually held the team.
+function countInWindow(members, fromISO, toISO){
+  return members.filter(r => {
+    const d = createdOf(r);
+    if (!d) return false;
+    const iso = d.toISOString();
+    return iso >= fromISO && iso <= toISO;
+  }).length;
+}
+
+// ── the form ─────────────────────────────────────────────────────
+function staffTeamOptions(selected){
+  const teams = buildTeams().filter(t => t.real);
+  return '<option value="">— none yet —</option>' + teams.map(t => {
+    const taken = staffOfTeam(t.code);
+    const mine  = selected && t.code === selected;
+    return `<option value="${escAttr(t.code)}"${mine?' selected':''}>${
+      escHtml(`${t.name} (${t.members.length})` + (taken && !mine ? ` — ${taken.name}` : ''))}</option>`;
+  }).join('');
+}
+
+async function saveStaffMember(){
+  const name   = document.getElementById('staff-name').value.trim();
+  const mobile = document.getElementById('staff-mobile').value.replace(/\D/g,'');
+  const role   = document.getElementById('staff-role').value.trim();
+  const team   = document.getElementById('staff-team').value;
+  if (!name){ toast('STAFF NAME IS REQUIRED','err'); document.getElementById('staff-name').focus(); return; }
+
+  const clash = staffList.find(s => s.name.toLowerCase() === name.toLowerCase()
+                                 && String(s.id) !== String(staffEditId));
+  if (clash && !confirm(`${clash.name} is already on the list.\n\nAdd a second entry with the same name?`)) return;
+
+  let id = staffEditId;
+  if (id){
+    const s = staffById(id);
+    if (s){ s.name = name; s.mobile = mobile; s.role = role; }
+  } else {
+    id = 'st' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    staffList.push({ id, name, mobile, role, since: new Date().toISOString() });
+  }
+
+  await persistStaff();
+  if (team && !currentTeamsOf(id).includes(team)) await assignTeamTo(team, id, true);
+  else { toast(staffEditId ? 'STAFF SAVED' : 'STAFF ADDED','ok'); cancelStaffEdit(); renderStaff(); }
+}
+
+function editStaff(id){
+  const s = staffById(id);
+  if (!s) return;
+  staffEditId = id;
+  document.getElementById('staff-name').value   = s.name || '';
+  document.getElementById('staff-mobile').value = s.mobile || '';
+  document.getElementById('staff-role').value   = s.role || '';
+  document.getElementById('staff-team').innerHTML = staffTeamOptions(currentTeamsOf(id)[0] || '');
+  document.getElementById('staff-form-title').textContent = '✎ EDIT ' + (s.name||'').toUpperCase();
+  document.getElementById('staff-save-btn').textContent = '⚡ SAVE CHANGES';
+  document.getElementById('staff-cancel-btn').style.display = '';
+  document.getElementById('staff-name').focus();
+  document.getElementById('staff-name').scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+function cancelStaffEdit(){
+  staffEditId = null;
+  ['staff-name','staff-mobile','staff-role'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('staff-team').innerHTML = staffTeamOptions('');
+  document.getElementById('staff-form-title').textContent = '➕ ADD STAFF MEMBER';
+  document.getElementById('staff-save-btn').textContent = '⚡ ADD STAFF';
+  document.getElementById('staff-cancel-btn').style.display = 'none';
+}
+
+async function removeStaff(id){
+  const s = staffById(id);
+  if (!s) return;
+  if (!confirm(`Remove ${s.name} from the staff list?\n\nTheir past assignments stay in the history, so year-end reports still show what they handled. Nobody's registration is touched.`)) return;
+  const now = new Date().toISOString();
+  staffAssignments.forEach(a => { if (String(a.staffId) === String(id) && !a.to) a.to = now; });
+  staffList = staffList.filter(x => String(x.id) !== String(id));
+  await persistStaff();
+  if (String(staffEditId) === String(id)) cancelStaffEdit();
+  toast('STAFF REMOVED — HISTORY KEPT','inf');
+  renderStaff();
+}
+
+// A hand-over closes the old row and opens a new one, so both are on record.
+async function assignTeamTo(group, staffId, quiet){
+  const now = new Date().toISOString();
+  const open = openAssignments().find(a => a.group === group);
+  if (open){
+    if (String(open.staffId) === String(staffId)) return;
+    open.to = now;
+  }
+  if (staffId) staffAssignments.push({ id: newAssignmentId(), staffId, group, from: now, to: null });
+  await idbSet('staffSavedAt', now);
+  await persistStaff();
+  if (!quiet){
+    const s = staffById(staffId);
+    toast(s ? `${s.name.toUpperCase()} NOW BOOKS ${group.toUpperCase()}` : `${group.toUpperCase()} UNASSIGNED`,'ok');
+  } else { toast('STAFF SAVED','ok'); }
+  cancelStaffEdit();
+  renderStaff();
+  if (document.getElementById('pg-teams').classList.contains('active')) renderTeams();
+}
+
+// ── the screen ───────────────────────────────────────────────────
+function staffRows(){
+  const byCode = Object.fromEntries(buildTeams().map(t => [t.code, t]));
+  const mk = thisMonthKey();
+  return staffList.map(s => {
+    const teams = currentTeamsOf(s.id).map(g => byCode[g]).filter(Boolean);
+    const past  = [...new Set(staffAssignments
+      .filter(a => String(a.staffId) === String(s.id)).map(a => a.group))];
+    return {
+      staff: s, teams, everGroups: past,
+      members: teams.reduce((n,t) => n + t.members.length, 0),
+      month:   teams.reduce((n,t) => n + countInMonth(t.members, mk), 0)
+    };
+  });
+}
+
+function renderStaff(){
+  const body = document.getElementById('staff-body');
+  const sel  = document.getElementById('staff-team');
+  if (sel && staffEditId === null) sel.innerHTML = staffTeamOptions('');
+
+  const yearSel = document.getElementById('staff-year');
+  if (yearSel){
+    const keep = yearSel.value;
+    yearSel.innerHTML = yearsCovered().map(y => `<option${y===keep?' selected':''}>${y}</option>`).join('');
+  }
+  renderCloudSetup();
+  const cloudEl = document.getElementById('staff-cloud');
+  if (cloudEl){
+    cloudEl.textContent = staffCloud ? '☁ SYNCED' : '💾 THIS DEVICE';
+    cloudEl.title = staffCloud
+      ? `Saved to the ${CLOUD_TABLE} table — available on every device`
+      : `Saved on this device only. Create an ${CLOUD_TABLE} table in Supabase to share it.`;
+    cloudEl.style.color = staffCloud ? 'var(--green)' : 'var(--orange)';
+  }
+
+  const allTeams = buildTeams().filter(t => t.real);
+  const rows = staffRows();
+  const mk = thisMonthKey();
+
+  const strip = document.getElementById('staff-strip');
+  strip.style.display = '';
+  const assigned = allTeams.filter(t => staffOfTeam(t.code)).length;
+  strip.innerHTML = `
+    <div class="stat c1"><div class="v">${staffList.length}</div><div class="l">STAFF</div></div>
+    <div class="stat c2"><div class="v">${assigned}</div><div class="l">TEAMS BOOKED</div></div>
+    <div class="stat c3"><div class="v">${allTeams.length - assigned}</div><div class="l">UNASSIGNED</div></div>
+    <div class="stat c4"><div class="v">${rows.reduce((n,r) => n + r.members, 0)}</div><div class="l">MEMBERS COVERED</div></div>
+    <div class="stat c5"><div class="v">${rows.reduce((n,r) => n + r.month, 0)}</div><div class="l">${escHtml(monthLabel(mk).toUpperCase())}</div></div>`;
+
+  if (!staffList.length){
+    body.innerHTML = `<div class="chk-empty"><div class="big">NO STAFF YET</div>
+      <p>ADD YOUR FIRST STAFF MEMBER ABOVE, THEN PICK THE TEAM THEY BOOK</p></div>`;
+    renderUnassignedTeams(allTeams);
+    return;
+  }
+
+  const q = (document.getElementById('staff-search').value || '').toLowerCase();
+  const shown = rows.filter(r => !q
+    || r.staff.name.toLowerCase().includes(q)
+    || (r.staff.role||'').toLowerCase().includes(q)
+    || (r.staff.mobile||'').includes(q)
+    || r.teams.some(t => t.name.toLowerCase().includes(q) || fullName(t.leader).toLowerCase().includes(q)));
+
+  if (!shown.length){
+    body.innerHTML = '<div class="chk-empty"><div class="big">NO MATCH</div><p>NO STAFF MATCHES THAT SEARCH</p></div>';
+    renderUnassignedTeams(allTeams);
+    return;
+  }
+
+  const dated = !!createdCol;
+  body.innerHTML = `<div class="table-card"><div class="table-scroll"><table>
+    <thead><tr>
+      <th>STAFF</th><th>MOBILE</th><th>ROLE</th><th>TEAM BOOKED NOW</th><th>TEAM LEADER</th>
+      <th style="text-align:right">MEMBERS</th>
+      <th style="text-align:right" title="${dated?'Registered this month':'Needs a created_at column'}">${escHtml(monthLabel(mk).toUpperCase())}</th>
+      <th style="text-align:right" title="Teams this person has handled, past and present">TEAMS EVER</th>
+      <th></th>
+    </tr></thead><tbody>` +
+    shown.map(({ staff: s, teams, members, month, everGroups }) => {
+      const t = teams[0], L = t?.leader;
+      const teamCell = teams.length
+        ? teams.map(x => {
+            const a = openAssignments().find(o => o.group === x.code);
+            return `<span class="tm-code" style="cursor:pointer" onclick="setGroupFilter('${escAttr(x.code)}')" title="Show this team's records">${escHtml(x.name)}</span>` +
+              (a ? `<div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">since ${escHtml(fmtCreated(new Date(a.from)))}</div>` : '');
+          }).join(' ')
+        : `<select class="nb-select nb-sm" onchange="assignTeamTo(this.value, '${escAttr(s.id)}')" aria-label="Assign a team to ${escAttr(s.name)}">
+             <option value="">— pick a team —</option>
+             ${allTeams.filter(x => !staffOfTeam(x.code)).map(x =>
+               `<option value="${escAttr(x.code)}">${escHtml(x.name)} (${x.members.length})</option>`).join('')}
+           </select>`;
+      return `<tr>
+        <td><strong>${escHtml(s.name)}</strong></td>
+        <td style="font-family:'Space Mono',monospace;font-size:12px;">${
+          s.mobile ? `<a href="tel:${escAttr(s.mobile)}" style="color:inherit;">${escHtml(s.mobile)}</a>` : '—'}</td>
+        <td style="font-size:12px;">${escHtml(s.role || '—')}</td>
+        <td>${teamCell}</td>
+        <td>${L ? `<strong>${escHtml(fullName(L))}</strong>
+              <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">${
+                escHtml(L.code||'')}${L.mobileNo ? ' · ' + escHtml(L.mobileNo) : ''}</div>` : '—'}</td>
+        <td style="text-align:right;font-weight:700;">${members}</td>
+        <td style="text-align:right;font-weight:700;color:${month?'var(--green)':'var(--muted)'};">${dated ? month : '—'}</td>
+        <td style="text-align:right;font-weight:700;">${everGroups.length}</td>
+        <td style="white-space:nowrap;">
+          <button class="nb nb-ghost nb-sm" onclick="editStaff('${escAttr(s.id)}')" title="Edit">✎</button>
+          ${t ? `<button class="nb nb-ghost nb-sm" onclick="printTeamSheet('${escAttr(t.code)}')" title="Print this team's roster">🖨</button>` : ''}
+          <button class="nb nb-red nb-sm" onclick="removeStaff('${escAttr(s.id)}')" title="Remove">✕</button>
+        </td></tr>`;
+    }).join('') + '</tbody></table></div></div>' +
+    renderAssignmentHistory() +
+    (dated ? '' : `<div style="margin-top:10px;padding:10px 14px;border:var(--b2);background:var(--surface-2);
+       font-family:'Space Mono',monospace;font-size:11px;line-height:1.7;">
+       ⚠ MONTHLY COLUMNS ARE EMPTY — the table has no <strong>created_at</strong> column, so there is no
+       registration date to group by. Add one in Supabase and every month fills in from then on.</div>`);
+
+  renderUnassignedTeams(allTeams);
+}
+
+// The hand-over log. This is the part a single "current team" field would have
+// destroyed, and the part the year-end question actually needs.
+function renderAssignmentHistory(){
+  const closed = staffAssignments.filter(a => a.to)
+    .sort((a,b) => String(b.to).localeCompare(String(a.to)));
+  if (!closed.length) return '';
+  const names = Object.fromEntries(staffList.map(s => [String(s.id), s.name]));
+  const byCode = Object.fromEntries(buildTeams().map(t => [t.code, t.name]));
+  const fmt = iso => iso ? fmtCreated(new Date(iso)) : 'now';
+  return `<div class="d-section" style="margin-top:18px;">
+    <div class="d-head">🕘 HAND-OVER HISTORY (${closed.length})</div>
+    <div style="padding:10px 14px;font-family:'Space Mono',monospace;font-size:11px;line-height:2.1;">` +
+    closed.slice(0, 40).map(a => `<div>
+      <strong>${escHtml(names[String(a.staffId)] || 'removed staff')}</strong>
+      handled <strong>${escHtml(byCode[a.group] || a.group)}</strong>
+      <span style="color:var(--muted);">${escHtml(fmt(a.from))} → ${escHtml(fmt(a.to))}</span></div>`).join('') +
+    (closed.length > 40 ? `<div style="color:var(--muted);">…and ${closed.length - 40} older. All of them are in the year-end PDF.</div>` : '') +
+    '</div></div>';
+}
+
+function renderUnassignedTeams(allTeams){
+  const box  = document.getElementById('staff-unassigned');
+  const free = allTeams.filter(t => !staffOfTeam(t.code));
+  if (!free.length || !staffList.length){ box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="d-section"><div class="d-head">⚠ TEAMS WITH NO STAFF (${free.length})</div>
+    <div style="padding:14px;display:flex;gap:10px;flex-wrap:wrap;">` +
+    free.map(t => `<div style="border:var(--b2);background:var(--surface);padding:8px 10px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:5px;">${escHtml(t.name)}
+        <span style="color:var(--muted);font-weight:400;">· ${t.members.length}</span></div>
+      <select class="nb-select nb-sm" onchange="assignTeamTo('${escAttr(t.code)}', this.value)" aria-label="Assign staff to ${escAttr(t.name)}">
+        <option value="">— assign staff —</option>
+        ${staffList.map(s => `<option value="${escAttr(s.id)}">${escHtml(s.name)}</option>`).join('')}
+      </select></div>`).join('') + '</div></div>';
+}
+
+// ── PDFs ─────────────────────────────────────────────────────────
+// All three go through the print shell the team sheets use; the browser's
+// print dialog saves them as PDF.
+function printStaffReport(){
+  const rows = staffRows();
+  if (!rows.length){ toast('ADD STAFF FIRST','err'); return; }
+  const mk = thisMonthKey(), dated = !!createdCol;
+
+  const body = rows.map((r, i) => {
+    const t = r.teams[0], L = t?.leader;
+    return `<tr style="background:${i%2?'#fafaf5':'#fff'}">
+      <td style="padding:7px;text-align:center;color:#888;font-size:11px;">${i+1}</td>
+      <td style="padding:7px;"><strong>${escHtml(r.staff.name)}</strong></td>
+      <td style="padding:7px;font-size:11px;">${escHtml(r.staff.role||'—')}</td>
+      <td style="padding:7px;font-family:monospace;font-size:11px;">${escHtml(r.staff.mobile||'—')}</td>
+      <td style="padding:7px;"><strong>${escHtml(t ? t.name : '— none —')}</strong>${
+        t ? `<div style="font-family:monospace;font-size:10px;color:#777;">${escHtml(t.range)}</div>` : ''}</td>
+      <td style="padding:7px;">${L ? escHtml(fullName(L)) : '—'}${
+        L ? `<div style="font-family:monospace;font-size:10px;color:#777;">${escHtml(L.code||'')}${
+             L.mobileNo ? ' · ' + escHtml(L.mobileNo) : ''}</div>` : ''}</td>
+      <td style="padding:7px;text-align:right;font-weight:700;">${r.members}</td>
+      <td style="padding:7px;text-align:right;font-weight:700;">${dated ? r.month : '—'}</td>
+      <td style="padding:7px;text-align:right;">${r.everGroups.length}</td>
+    </tr>`;
+  }).join('');
+
+  const detail = rows.filter(r => r.teams.length).map(r => {
+    const t = r.teams[0], L = t.leader;
+    return `<div><h2 style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;
+        margin:20px 0 4px;border-bottom:3px solid #000;padding-bottom:4px;">
+        ${escHtml(r.staff.name.toUpperCase())} — ${escHtml(t.name.toUpperCase())}</h2>
+      <div style="font-size:11px;color:#555;margin-bottom:8px;">
+        ${escHtml(r.staff.role||'Coordinator')}${r.staff.mobile?' · '+escHtml(r.staff.mobile):''} ·
+        LEADER: ${escHtml(fullName(L))}${L?.mobileNo?' ('+escHtml(L.mobileNo)+')':''} ·
+        ${t.members.length} MEMBERS</div>
+      <table><thead><tr><th>#</th><th>CODE</th><th>NAME</th><th>ID</th><th>DOB</th><th>GENDER</th><th>MOBILE</th><th>LOCATION</th>${
+        dated?'<th>REGISTERED</th>':''}</tr></thead><tbody>` +
+      t.members.map((m, i) => `<tr style="background:${i%2?'#fafaf5':'#fff'}">
+        <td style="padding:6px;text-align:center;color:#888;font-size:10px;">${i+1}</td>
+        <td style="padding:6px;font-family:monospace;font-size:11px;font-weight:700;">${escHtml(m.code||'—')}</td>
+        <td style="padding:6px;">${escHtml(fullName(m))}</td>
+        <td style="padding:6px;font-family:monospace;font-size:11px;">${escHtml(m.idNumber||'')}</td>
+        <td style="padding:6px;font-size:11px;">${escHtml(normDob(m.dob)||'—')}</td>
+        <td style="padding:6px;font-size:11px;">${escHtml(normGender(m.gender)||'—')}</td>
+        <td style="padding:6px;font-family:monospace;font-size:11px;">${escHtml(m.mobileNo||'—')}</td>
+        <td style="padding:6px;font-size:11px;">${escHtml([m.city,m.district].filter(Boolean).join(', '))}</td>
+        ${dated?`<td style="padding:6px;font-size:10px;">${escHtml(fmtCreated(createdOf(m)))}</td>`:''}
+      </tr>`).join('') + '</tbody></table></div>';
+  }).join('');
+
+  openPrintWindow('Staff and teams', `
+    <div class="hd"><div><h1>STAFF &amp; TEAMS</h1>
+      <div class="sb">${rows.length} STAFF · ${rows.reduce((n,r)=>n+r.members,0)} MEMBERS COVERED</div></div>
+      <div class="mt">${escHtml(monthLabel(mk).toUpperCase())}<br>${escHtml(new Date().toLocaleString('en-IN'))}</div></div>
+    <table><thead><tr><th>#</th><th>STAFF</th><th>ROLE</th><th>MOBILE</th><th>TEAM BOOKED</th><th>TEAM LEADER</th>
+      <th style="text-align:right">MEMBERS</th><th style="text-align:right">${escHtml(monthLabel(mk).toUpperCase())}</th>
+      <th style="text-align:right">TEAMS EVER</th></tr></thead><tbody>${body}</tbody></table>
+    ${detail}`);
+  toast(`STAFF REPORT READY — ${rows.length} STAFF`,'ok');
+}
+
+function printMonthlyReport(){
+  if (!createdCol){ toast('NO created_at COLUMN — NOTHING TO GROUP BY MONTH','err'); return; }
+  const rows = staffRows().filter(r => r.teams.length);
+  if (!rows.length){ toast('ASSIGN A TEAM TO SOME STAFF FIRST','err'); return; }
+  const months = monthsPresent();
+  if (!months.length){ toast('NO DATED RECORDS YET','err'); return; }
+
+  // Anyone whose team has no staff still has to appear, or the totals quietly
+  // disagree with the registry and the whole sheet stops being checkable.
+  const held = new Set(rows.flatMap(r => r.teams.map(t => t.code)));
+  const orphans = allRecords.filter(r => !held.has(codeGroup(r.code)));
+
+  const head = `<tr><th>MONTH</th>${rows.map(r =>
+    `<th style="text-align:right">${escHtml(r.staff.name)}<div style="font-weight:400;opacity:.65;">${
+      escHtml(r.teams[0].name)}</div></th>`).join('')}${
+    orphans.length ? '<th style="text-align:right">NO STAFF<div style="font-weight:400;opacity:.65;">unassigned</div></th>' : ''
+    }<th style="text-align:right">TOTAL</th></tr>`;
+
+  let grand = 0, grandOrphan = 0;
+  const body = months.map((k, i) => {
+    let mTotal = 0;
+    const cells = rows.map(r => {
+      const n = countInMonth(r.teams[0].members, k);
+      mTotal += n;
+      return `<td style="padding:7px;text-align:right;${n?'font-weight:700;':'color:#bbb;'}">${n||'·'}</td>`;
+    }).join('');
+    let orphanCell = '';
+    if (orphans.length){
+      const n = countInMonth(orphans, k);
+      grandOrphan += n; mTotal += n;
+      orphanCell = `<td style="padding:7px;text-align:right;${n?'font-weight:700;color:#E63030;':'color:#bbb;'}">${n||'·'}</td>`;
+    }
+    grand += mTotal;
+    return `<tr style="background:${i%2?'#fafaf5':'#fff'}">
+      <td style="padding:7px;font-weight:700;">${escHtml(monthLabel(k))}</td>${cells}${orphanCell}
+      <td style="padding:7px;text-align:right;font-weight:700;background:#fffbd6;">${mTotal}</td></tr>`;
+  }).join('');
+
+  openPrintWindow('Monthly bookings', `
+    <div class="hd"><div><h1>MONTHLY BOOKINGS</h1>
+      <div class="sb">BY STAFF AND TEAM · ${months.length} MONTH${months.length===1?'':'S'}</div></div>
+      <div class="mt">${escHtml(new Date().toLocaleString('en-IN'))}</div></div>
+    <table><thead>${head}</thead><tbody>${body}
+      <tr style="background:#111;color:#ffe500;"><td style="padding:8px;font-weight:700;">ALL TIME</td>${
+        rows.map(r => `<td style="padding:8px;text-align:right;font-weight:700;">${r.members}</td>`).join('')}${
+        orphans.length ? `<td style="padding:8px;text-align:right;font-weight:700;">${orphans.length}</td>` : ''}
+        <td style="padding:8px;text-align:right;font-weight:700;">${grand}</td></tr></tbody></table>
+    <p style="margin-top:10px;font-size:10px;color:#777;">Counted by each record's registration date.
+      A person counts under the staff member who books their team, which follows from their code.${
+      orphans.length ? ` ${grandOrphan} registration${grandOrphan===1?'':'s'} in these months sit in teams with no staff assigned — the NO STAFF column.` : ''}</p>`);
+  toast(`MONTHLY REPORT READY — ${months.length} MONTHS`,'ok');
+}
+
+// The year-end answer: which teams each staff member handled that year, for
+// how long, and how many people came in while they held each one.
+function printYearReport(){
+  const year = document.getElementById('staff-year').value || String(new Date().getFullYear());
+  const from = `${year}-01-01T00:00:00.000Z`;
+  const to   = `${year}-12-31T23:59:59.999Z`;
+  const live = assignmentsInRange(from, to);
+  if (!live.length){ toast(`NO ASSIGNMENTS IN ${year}`,'err'); return; }
+
+  const byCode = Object.fromEntries(buildTeams().map(t => [t.code, t]));
+  const names  = Object.fromEntries(staffList.map(s => [String(s.id), s]));
+  const dated  = !!createdCol;
+  const fmt = iso => iso ? fmtCreated(new Date(iso)) : '—';
+
+  const ids = [...new Set(live.map(a => String(a.staffId)))];
+  const sections = ids.map(id => {
+    const s = names[id] || { name: 'Removed staff', role: '', mobile: '' };
+    const mine = live.filter(a => String(a.staffId) === id);
+    const groups = [...new Set(mine.map(a => a.group))];
+    let joined = 0;
+    const rows = mine.map(a => {
+      const t = byCode[a.group];
+      // An assignment starts the day it is recorded here, which is long after
+      // the team's existing members joined. For the team's FIRST holder there
+      // is no earlier claim on those people, so their window opens with the
+      // year; a later holder's window still opens at the hand-over.
+      const firstForGroup = staffAssignments
+        .filter(x => x.group === a.group)
+        .sort((x,y) => String(x.from).localeCompare(String(y.from)))[0];
+      const isFirst = firstForGroup && firstForGroup.id === a.id;
+      const start = (isFirst || a.from < from) ? from : a.from;
+      const end   = (a.to && a.to < to) ? a.to : to;
+      const n = (dated && t) ? countInWindow(t.members, start, end) : 0;
+      joined += n;
+      return `<tr>
+        <td style="padding:7px;"><strong>${escHtml(t ? t.name : a.group)}</strong></td>
+        <td style="padding:7px;font-family:monospace;font-size:11px;">${escHtml(t ? t.range : '—')}</td>
+        <td style="padding:7px;font-size:11px;">${escHtml(fmt(a.from))} → ${escHtml(a.to ? fmt(a.to) : 'still holding')}</td>
+        <td style="padding:7px;">${t?.leader ? escHtml(fullName(t.leader)) : '—'}${
+          t?.leader?.mobileNo ? `<div style="font-family:monospace;font-size:10px;color:#777;">${escHtml(t.leader.mobileNo)}</div>` : ''}</td>
+        <td style="padding:7px;text-align:right;font-weight:700;">${t ? t.members.length : '—'}</td>
+        <td style="padding:7px;text-align:right;font-weight:700;">${dated ? n : '—'}</td></tr>`;
+    }).join('');
+    return `<h2 style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;
+        margin:20px 0 4px;border-bottom:3px solid #000;padding-bottom:4px;">
+        ${escHtml(s.name.toUpperCase())}
+        <span style="font-family:'DM Sans',sans-serif;font-size:12px;letter-spacing:0;font-weight:400;">
+          — ${groups.length} TEAM${groups.length===1?'':'S'} IN ${escHtml(year)}${
+          dated ? ` · ${joined} REGISTERED WHILE HOLDING` : ''}</span></h2>
+      <div style="font-size:11px;color:#555;margin-bottom:8px;">${escHtml(s.role||'Coordinator')}${
+        s.mobile ? ' · ' + escHtml(s.mobile) : ''}</div>
+      <table><thead><tr><th>TEAM</th><th>CODES</th><th>HELD</th><th>TEAM LEADER</th>
+        <th style="text-align:right">MEMBERS NOW</th>
+        <th style="text-align:right">JOINED WHILE HELD</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }).join('');
+
+  const summary = ids.map((id, i) => {
+    const s = names[id] || { name:'Removed staff' };
+    const groups = [...new Set(live.filter(a => String(a.staffId) === id).map(a => a.group))];
+    return `<tr style="background:${i%2?'#fafaf5':'#fff'}">
+      <td style="padding:7px;text-align:center;color:#888;font-size:11px;">${i+1}</td>
+      <td style="padding:7px;"><strong>${escHtml(s.name)}</strong></td>
+      <td style="padding:7px;text-align:right;font-weight:700;">${groups.length}</td>
+      <td style="padding:7px;">${escHtml(groups.map(g => byCode[g]?.name || g).join(', '))}</td></tr>`;
+  }).join('');
+
+  openPrintWindow(`Year end ${year}`, `
+    <div class="hd"><div><h1>YEAR END ${escHtml(year)}</h1>
+      <div class="sb">TEAMS HANDLED BY EACH STAFF MEMBER</div></div>
+      <div class="mt">${ids.length} STAFF<br>${escHtml(new Date().toLocaleString('en-IN'))}</div></div>
+    <table><thead><tr><th>#</th><th>STAFF</th><th style="text-align:right">TEAMS HANDLED</th>
+      <th>WHICH TEAMS</th></tr></thead><tbody>${summary}</tbody></table>
+    ${sections}
+    <p style="margin-top:14px;font-size:10px;color:#777;">
+      Built from the hand-over history, so a team that changed hands during ${escHtml(year)}
+      appears under both staff members with the dates each of them held it.
+      "Joined while held" counts registrations inside that window; for a team's first
+      holder the window opens with the year, since nobody else had claim on its members.</p>`);
+  toast(`YEAR-END ${year} READY — ${ids.length} STAFF`,'ok');
+}
+
+// ── monthly rotation ─────────────────────────────────────────────
+// Teams change hands every month, so doing it one dropdown at a time is the
+// wrong shape. This sets the whole board at once: one close, one open, one
+// save, and the history keeps every month that came before.
+function openRotation(){
+  if (!staffList.length){ toast('ADD STAFF FIRST','err'); return; }
+  const teams = buildTeams().filter(t => t.real);
+  if (!teams.length){ toast('NO TEAMS IN THE REGISTRY YET','err'); return; }
+
+  document.getElementById('rotate-rows').innerHTML = staffList.map(s => {
+    const now = currentTeamsOf(s.id)[0] || '';
+    const held = teams.find(t => t.code === now);
+    return `<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:2px solid var(--line);">
+      <div style="flex:1 1 150px;">
+        <strong>${escHtml(s.name)}</strong>
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">
+          ${escHtml(s.role || 'Coordinator')}${held ? ' · now: ' + escHtml(held.name) : ' · no team'}</div>
+      </div>
+      <select class="nb-select nb-sm" data-staff="${escAttr(s.id)}" style="flex:0 1 210px;"
+              onchange="checkRotationClashes()" aria-label="New team for ${escAttr(s.name)}">
+        <option value="">— none this month —</option>
+        ${teams.map(t => `<option value="${escAttr(t.code)}"${t.code===now?' selected':''}>${
+          escHtml(t.name)} (${t.members.length})</option>`).join('')}
+      </select></div>`;
+  }).join('');
+  checkRotationClashes();
+  openOverlay('rotate-overlay');
+}
+function closeRotation(){ closeOverlay('rotate-overlay'); }
+
+// Two people cannot hold the same team, and finding that out after the fact
+// would mean unpicking a month of history.
+function checkRotationClashes(){
+  const picks = [...document.querySelectorAll('#rotate-rows select')];
+  const seen = {}, dupes = new Set();
+  picks.forEach(p => {
+    if (!p.value) return;
+    if (seen[p.value]) dupes.add(p.value); else seen[p.value] = true;
+  });
+  picks.forEach(p => p.style.borderColor = dupes.has(p.value) ? 'var(--red)' : '');
+  const warn = document.getElementById('rotate-warn');
+  const btn  = document.getElementById('rotate-btn');
+  if (dupes.size){
+    warn.style.color = 'var(--red)';
+    warn.textContent = `⚠ ${[...dupes].join(', ').toUpperCase()} PICKED TWICE — ONE TEAM, ONE STAFF MEMBER`;
+    btn.disabled = true;
+  } else {
+    const changing = picks.filter(p => (currentTeamsOf(p.dataset.staff)[0] || '') !== p.value).length;
+    warn.style.color = 'var(--muted)';
+    warn.textContent = changing ? `${changing} CHANGE${changing===1?'':'S'} READY` : 'NOTHING CHANGED YET';
+    btn.disabled = !changing;
+  }
+}
+
+async function applyRotation(){
+  const picks = [...document.querySelectorAll('#rotate-rows select')]
+    .map(p => ({ staffId: p.dataset.staff, group: p.value }))
+    .filter(p => (currentTeamsOf(p.staffId)[0] || '') !== p.group);
+  if (!picks.length){ toast('NOTHING TO CHANGE','inf'); return; }
+
+  const now = new Date().toISOString();
+  // Close every seat that is moving before opening any, or a team handed from
+  // one person to another would briefly look held by both.
+  picks.forEach(p => {
+    staffAssignments.forEach(a => {
+      if (!a.to && (String(a.staffId) === String(p.staffId) || a.group === p.group)) a.to = now;
+    });
+  });
+  picks.forEach(p => {
+    if (p.group) staffAssignments.push({ id: newAssignmentId(), staffId: p.staffId, group: p.group, from: now, to: null });
+  });
+
+  await idbSet('staffSavedAt', now);
+  await persistStaff();
+  closeRotation();
+  renderStaff();
+  if (document.getElementById('pg-teams').classList.contains('active')) renderTeams();
+  toast(`ROTATION APPLIED — ${picks.length} CHANGE${picks.length===1?'':'S'}`,'ok');
+}
+
+// ── backup ───────────────────────────────────────────────────────
+async function exportStaffBackup(){
+  const data = {
+    kind: 'sevak-registry-settings', version: 2,
+    savedAt: new Date().toISOString(),
+    staffList, staffAssignments,
+    teamNames:    (await idbGet('teamNames'))    || {},
+    teamLeaders:  (await idbGet('teamLeaders'))  || {},
+    teamWhatsapp: (await idbGet('teamWhatsapp')) || {}
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `sevak-settings-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast('BACKUP SAVED','ok');
+}
+
+async function importStaffBackup(ev){
+  const f = ev.target.files[0];
+  ev.target.value = '';
+  if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (d.kind !== 'sevak-registry-settings') throw new Error('Not a settings backup');
+    if (!confirm(`Restore ${(d.staffList||[]).length} staff and their assignment history?\n\nThis replaces the staff list, team names and leaders on THIS device. Registrations are untouched.`)) return;
+    staffList        = d.staffList || [];
+    staffAssignments = d.staffAssignments
+      || Object.entries(d.staffTeams || {}).map(([group, staffId]) => ({
+           id: newAssignmentId(), staffId, group, from: d.savedAt || new Date().toISOString(), to: null }));
+    if (d.teamNames)    { teamNames    = d.teamNames;    await idbSet('teamNames', teamNames); }
+    if (d.teamLeaders)  { teamLeaders  = d.teamLeaders;  await idbSet('teamLeaders', teamLeaders); }
+    if (d.teamWhatsapp) { teamWhatsapp = d.teamWhatsapp; await idbSet('teamWhatsapp', teamWhatsapp); }
+    await persistStaff();
+    renderStaff();
+    toast(`RESTORED ${staffList.length} STAFF`,'ok');
+  } catch(e){ toast('RESTORE FAILED: '+e.message,'err'); }
+}
+
+loadStaff();
 
 </script>
 </body>
