@@ -9160,6 +9160,31 @@ function staffMonthConflict(staffId, group, key){
   return { group: clash.group, name: t ? t.name : clash.group, open: !clash.to };
 }
 
+// A move that leaves somebody with two teams inside one month is unusual
+// enough to ask about and ordinary enough to allow. Returns false only if the
+// person says no.
+function monthMoveOk(staffId, group, current){
+  const s = staffById(staffId);
+  if (!s) return true;
+  const name = g => buildTeams().find(t => t.code === g)?.name || g;
+  const { from, to } = monthRange(thisMonthKey());
+
+  // Everything they have already been on this month, not just the first one
+  // found — after two moves "already been on AA" would be stale advice.
+  const had = [...new Set(staffAssignments
+    .filter(a => String(a.staffId) === String(staffId) && a.group !== group &&
+                 (a.from || '') <= to && (a.to || '9999') >= from)
+    .map(a => a.group))].map(name);
+  if (!had.length) return true;
+
+  const list = had.length === 1 ? had[0]
+             : had.slice(0, -1).join(', ') + ' and ' + had[had.length - 1];
+  return confirm(
+    `${s.name} has already been on ${list} during ${monthLabel(thisMonthKey())}.\n\n` +
+    `Putting them on ${name(group)} as well makes ${had.length + 1} teams for them this month. ` +
+    `All of them stay in the history and show in the year-end report with the dates each was held.\n\nGo ahead?`);
+}
+
 // Changing who books a team, or which team somebody books, is a move: the
 // seat being left closes as the new one opens. Doing it as an add would trip
 // the one-team-a-month rule against the very team they are leaving.
@@ -9169,17 +9194,10 @@ async function setStaffTeam(staffId, group){
   const current = currentTeamsOf(staffId)[0] || '';
   if (current === group){ renderStaff(); return; }
 
-  const clash = staffMonthConflict(staffId, group);
-  if (clash && !(clash.open && clash.group === current)){
-    toast(`${s.name.toUpperCase()} ALREADY HAD ${clash.name.toUpperCase()} THIS MONTH`,'err');
-    alert(`${s.name} was already on ${clash.name} in ${monthLabel(thisMonthKey())}.\n\nOne team per person per month — move them next month instead.`);
-    refreshBookingViews();
-    return;
-  }
-  if (current && group && new Date().getDate() !== 1 &&
-      !confirm(`${s.name} moves off ${buildTeams().find(t=>t.code===current)?.name || current} onto ${
-        buildTeams().find(t=>t.code===group)?.name || group} today.\n\nThat leaves them holding two teams in ${
-        monthLabel(thisMonthKey())}. Continue?`)) { refreshBookingViews(); return; }
+  // One team a month is how this is meant to run, not a lock. Locking it
+  // meant a staff member who had already moved once could not be moved again
+  // until the month turned, which is not a decision the app gets to make.
+  if (group && !monthMoveOk(staffId, group, current)){ refreshBookingViews(); return; }
 
   const now = new Date().toISOString();
   staffAssignments.forEach(a => {
@@ -9216,11 +9234,7 @@ function refreshBookingViews(){
 }
 
 async function assignTeamTo(group, staffId, quiet){
-  const clash = staffMonthConflict(staffId, group);
-  if (clash){
-    const s = staffById(staffId);
-    toast(`${(s?.name||'THIS PERSON').toUpperCase()} ALREADY HAS ${clash.name.toUpperCase()} THIS MONTH`,'err');
-    alert(`${s?.name || 'This person'} is already down for ${clash.name} in ${monthLabel(thisMonthKey())}.\n\nOne team per person per month. Move them next month, or give ${clash.name} to somebody else first.`);
+  if (staffId && !monthMoveOk(staffId, group, currentTeamsOf(staffId)[0] || '')){
     renderStaff();
     return;
   }
@@ -9335,7 +9349,7 @@ function renderStaff(){
             // The team they currently hold is the seat they would vacate by
             // moving, not a clash — only a team already given up this month is.
             if (c && c.open && c.group === mine) c = null;
-            return `<option value="${escAttr(x.code)}"${isMine?' selected':''}${c?' disabled':''}>${
+            return `<option value="${escAttr(x.code)}"${isMine?' selected':''}>${
               escHtml(`${x.name} (${x.members.length})`
                 + (held ? ` — with ${held.name}` : '')
                 + (c ? ` · had ${c.name} this month` : ''))}</option>`;
@@ -9402,7 +9416,7 @@ function renderUnassignedTeams(allTeams){
         <option value="">— assign staff —</option>
         ${staffList.map(s => {
           const c = staffMonthConflict(s.id, t.code);
-          return `<option value="${escAttr(s.id)}"${c?' disabled':''}>${
+          return `<option value="${escAttr(s.id)}">${
             escHtml(s.name + (c ? ` — has ${c.name} this month` : ''))}</option>`;
         }).join('')}
       </select></div>`).join('') + '</div></div>';
@@ -10344,7 +10358,7 @@ function renderMonth(){
                const isMine = String(st.id) === String(x.a.staffId);
                let c = isMine ? null : staffMonthConflict(st.id, x.team.code);
                if (c && c.open && c.group === (currentTeamsOf(st.id)[0] || '')) c = null;
-               return `<option value="${escAttr(st.id)}"${isMine?' selected':''}${c?' disabled':''}>${
+               return `<option value="${escAttr(st.id)}"${isMine?' selected':''}>${
                  escHtml(st.name + (c ? ` — has ${c.name}` : ''))}</option>`;
              }).join('')}
            </select>`
