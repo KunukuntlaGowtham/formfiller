@@ -1366,9 +1366,9 @@ body.dense .av { width: 30px !important; height: 30px !important; }
 <!-- ═══ CONFIG BAR ═══ -->
 <div id="cfg-bar">
   <label for="cfg-url">Supabase URL</label>
-  <input class="cfg-input" id="cfg-url" placeholder="https://xxxx.supabase.co" />
+  <input class="cfg-input" id="cfg-url" value="https://qzzcpuvcrhbasnnsfvgt.supabase.co" placeholder="https://xxxx.supabase.co" />
   <label for="cfg-key">Anon Key</label>
-  <input class="cfg-input" id="cfg-key" type="password" placeholder="eyJ..." />
+  <input class="cfg-input" id="cfg-key" type="password" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6emNwdXZjcmhiYXNubnNmdmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1NDc2MTgsImV4cCI6MjA4NTEyMzYxOH0._MAMf4jVmNBarBLM1nSKdbjeq7lxRUjfQCnf5cxK4X8" placeholder="eyJ..." />
   <label for="cfg-table">Table</label>
   <input class="cfg-input" id="cfg-table" value="customers" placeholder="table name" />
   <label for="cfg-gemini">Gemini Key</label>
@@ -8725,6 +8725,14 @@ document.addEventListener('keydown', e => {
 // ════════════════════════════════════════════
 loadTheme();
 loadDensity();
+// The connection is baked into the config bar above. Connect on load so the
+// registry is there when the page opens; the fields stay editable for anyone
+// who needs to point at a different project or table.
+(function autoConnect(){
+  const url = document.getElementById('cfg-url')?.value.trim();
+  const key = document.getElementById('cfg-key')?.value.trim();
+  if (url && key) connect();
+})();
 measureChrome();
 bkRenderSidebar();
 populateStateSelects();   // the dropdown must work before anyone connects
