@@ -56,7 +56,6 @@
   --sh:  6px 6px 0 var(--shadow-c);
   --shm: 4px 4px 0 var(--shadow-c);
   --shs: 3px 3px 0 var(--shadow-c);
-  --chrome-h: 124px; /* measured at runtime: config bar + nav */
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -720,78 +719,13 @@ canvas.ec.crop { cursor: crosshair; }
 .doc-crop-person-bar p { font-size: 11px; color: var(--muted); flex: 1; font-family: 'Space Mono', monospace; }
 #crop-person-status { font-size: 11px; font-family: 'Space Mono', monospace; }
 
-/* ═══════════════════════════════════════════════
-   BULK REGISTER PAGE
-═══════════════════════════════════════════════ */
-#pg-bulk { display:none; }
-#pg-bulk.active { display:flex; height:calc(100vh - var(--chrome-h)); overflow:hidden; }
 
-/* sidebar */
-.bk-sidebar {
-  width:190px; flex-shrink:0; background: var(--chrome);
-  border-right:3px solid #222; display:flex; flex-direction:column; overflow:hidden;
-}
-.bk-sidebar-hd {
-  padding:10px 12px; border-bottom:2px solid #2a2a2a;
-  font-family:'Space Mono',monospace; font-size:9px; color:var(--yellow);
-  letter-spacing:2px; display:flex; align-items:center; justify-content:space-between;
-}
-.bk-list { flex:1; overflow-y:auto; padding:6px; display:flex; flex-direction:column; gap:5px; }
-.bk-list::-webkit-scrollbar { width:3px; }
-.bk-list::-webkit-scrollbar-thumb { background:var(--muted-strong); }
-.bk-card {
-  border:2px solid #2e2e2e; cursor:pointer; position:relative;
-  transition:border-color .12s;
-}
-.bk-card:hover  { border-color:var(--muted-strong); }
-.bk-card.active { border-color:var(--yellow); }
-.bk-card.saved  { border-color:var(--green); }
-.bk-card-img { width:100%; height:65px; object-fit:cover; object-position:50% 25%; display:block; background:#1a1a1a; }
-.bk-card-ph  { width:100%; height:65px; background:#1a1a1a; display:flex; align-items:center; justify-content:center; font-size:26px; }
-.bk-card-info { padding:5px 7px; }
-.bk-card-name { font-size:11px; font-weight:700; color:var(--muted-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.bk-card-id   { font-family:'Space Mono',monospace; font-size:8px; color:var(--muted-strong); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.bk-card-sts  { position:absolute; top:3px; right:3px; font-size:11px; }
-.bk-del-btn   {
-  position:absolute; top:3px; left:3px; background:var(--red); color:#fff;
-  border:none; width:16px; height:16px; font-size:9px; font-weight:900;
-  cursor:pointer; display:none; align-items:center; justify-content:center;
-}
-.bk-card:hover .bk-del-btn { display:flex; }
 
-.bk-sidebar-ft { padding:8px; border-top:2px solid #2a2a2a; display:flex; flex-direction:column; gap:5px; }
 
-/* main form panel */
-.bk-panel { flex:1; overflow-y:auto; background:var(--white); display:flex; flex-direction:column; }
-.bk-panel::-webkit-scrollbar { width:5px; }
-.bk-panel::-webkit-scrollbar-thumb { background:var(--muted-3); }
 
-.bk-topbar {
-  position:sticky; top:0; z-index:50; background:var(--yellow);
-  border-bottom:var(--b3); padding:9px 18px;
-  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-}
-.bk-nav { background: var(--chrome); color:var(--yellow); border:2px solid var(--chrome); padding:5px 12px; font-weight:700; font-size:12px; cursor:pointer; }
-.bk-nav:disabled { opacity:.3; cursor:default; }
-.bk-counter { font-family:'Bebas Neue',sans-serif; font-size:22px; color: var(--ink); letter-spacing:1px; }
-.bk-person-lbl { font-family:'Space Mono',monospace; font-size:10px; color:rgba(0,0,0,.5); }
-
-.bk-empty {
-  flex:1; display:flex; flex-direction:column; align-items:center;
-  justify-content:center; gap:14px; color:var(--muted-2); padding:40px;
-}
-.bk-empty .ico { font-size:56px; }
-.bk-empty h2 { font-family:'Bebas Neue',sans-serif; font-size:32px; letter-spacing:2px; color:var(--muted-3); }
-.bk-empty p  { font-family:'Space Mono',monospace; font-size:10px; text-align:center; line-height:2; }
 
 /* per-person form: hidden by default, shown when active */
-.bk-person-form { display:none; }
-.bk-person-form.active { display:block; }
 
-/* progress */
-.bk-prog-wrap { background:var(--surface-3); border:var(--b2); height:20px; overflow:hidden; margin:0 20px 8px; }
-.bk-prog-fill { height:100%; background:var(--green); transition:width .3s; display:flex; align-items:center; padding-left:8px; }
-.bk-prog-fill span { font-family:'Space Mono',monospace; font-size:9px; color:#fff; white-space:nowrap; }
 
 /* field error highlight */
 .fld.berr input, .fld.berr select { border-color:var(--red)!important; background:var(--tint-red)!important; }
@@ -1345,6 +1279,16 @@ body.dense .av { width: 30px !important; height: 30px !important; }
   cursor: pointer; font-size: 12px; padding: 4px 6px;
 }
 .fast-x:hover { color: var(--red); }
+.fast-photo-cell { text-align: center; padding: 0 2px !important; }
+.fast-photo-btn {
+  width: 38px; height: 38px; padding: 0; cursor: pointer;
+  border: var(--b2); background: var(--surface-2); font-size: 15px;
+  display: inline-flex; align-items: center; justify-content: center;
+  overflow: hidden; vertical-align: middle;
+}
+.fast-photo-btn:hover { border-color: var(--blue); }
+.fast-photo-btn.has-photo { border-color: var(--green); padding: 0; }
+.fast-photo-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
 .fast-log-box {
   font-family: 'Space Mono', monospace; font-size: 11px; line-height: 1.8;
   max-height: 180px; overflow-y: auto;
@@ -1429,9 +1373,6 @@ body.dense .av { width: 30px !important; height: 30px !important; }
     </button>
     <button class="tab-btn" data-tab="register" onclick="switchTab('register')">
       ✚ REGISTER NEW
-    </button>
-    <button class="tab-btn" data-tab="bulk" onclick="switchTab('bulk')">
-      ⚡ BULK REGISTER
     </button>
     <button class="tab-btn" data-tab="fast" onclick="switchTab('fast')">
       ⌨ FAST ENTRY
@@ -1871,73 +1812,14 @@ body.dense .av { width: 30px !important; height: 30px !important; }
   </div>
 </div>
 
-<!-- ═══════════════════ PAGE: BULK REGISTER ═══════════════════ -->
-<div class="page" id="pg-bulk">
-
-  <!-- SIDEBAR -->
-  <div class="bk-sidebar">
-    <div class="bk-sidebar-hd">
-      PERSONS <span id="bk-badge" style="background:var(--yellow);color:#000;padding:1px 7px;border-radius:20px;margin-left:4px;">0</span>
-    </div>
-    <div class="bk-list" id="bk-list"></div>
-    <div class="bk-sidebar-ft">
-      <button class="nb nb-yellow nb-sm" style="width:100%;justify-content:center;" onclick="bkAdd()">＋ ADD PERSON</button>
-      <button class="nb nb-black nb-sm" style="width:100%;justify-content:center;" onclick="document.getElementById('bk-photos-input').click()">📸 IMPORT PHOTOS</button>
-      <input type="file" id="bk-photos-input" accept="image/*" multiple style="display:none" aria-label="Import photos" onchange="bkImportPhotos(this.files)">
-      <button class="nb nb-ghost nb-sm" style="width:100%;justify-content:center;" onclick="bkClearAll()">✕ CLEAR ALL</button>
-    </div>
-  </div>
-
-  <!-- MAIN PANEL -->
-  <div class="bk-panel" id="bk-panel">
-
-    <!-- empty state -->
-    <div class="bk-empty" id="bk-empty">
-      <div class="ico" aria-hidden="true">👥</div>
-      <h2>NO PERSONS YET</h2>
-      <p>CLICK ＋ ADD PERSON OR<br>📸 IMPORT PHOTOS TO BEGIN</p>
-      <div style="display:flex;gap:10px;margin-top:6px;">
-        <button class="nb nb-yellow" onclick="bkAdd()">＋ ADD PERSON</button>
-        <button class="nb nb-black" onclick="document.getElementById('bk-photos-input').click()">📸 IMPORT PHOTOS</button>
-      </div>
-      <button class="nb nb-green" id="bk-restore-draft" style="display:none;margin-top:4px;" onclick="restoreBulkDraft()">♻ RESTORE DRAFT</button>
-      <button class="nb nb-ghost nb-sm" style="margin-top:2px;" onclick="discardBulkDraft()">DISCARD SAVED DRAFT</button>
-    </div>
-
-    <!-- top nav bar (shown once persons exist) -->
-    <div class="bk-topbar" id="bk-topbar" style="display:none;">
-      <button class="bk-nav" id="bk-prev" onclick="bkNav(-1)" disabled>◀ PREV</button>
-      <span class="bk-counter" id="bk-counter">1 / 1</span>
-      <button class="bk-nav" id="bk-next" onclick="bkNav(1)">NEXT ▶</button>
-      <span class="bk-person-lbl" id="bk-lbl"></span>
-      <button class="nb nb-yellow nb-sm" onclick="bkAssignCodes()" title="Give the whole queue a run of codes">🏷 ASSIGN CODES</button>
-      <button class="nb nb-ghost nb-sm" onclick="bkCopyPrev()" title="Copy code + address from the previous person (Ctrl+D)">⧉ SAME AS PREV</button>
-      <button class="nb nb-ghost nb-sm" onclick="bkApplyToAll()" title="Copy this person's code + address to everyone else">⇊ APPLY TO ALL</button>
-      <button class="nb nb-blue nb-sm" id="bk-scan-all" onclick="bkScanAll()" title="Run Gemini OCR on every loaded form">🔍 SCAN ALL FORMS</button>
-      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
-        <span id="bk-save-status" style="font-family:'Space Mono',monospace;font-size:9px;"></span>
-        <button class="nb nb-black nb-sm" id="bk-save-all" onclick="bkSaveAll()">🚀 SAVE ALL</button>
-      </div>
-    </div>
-
-    <!-- progress + log (during save) -->
-    <div class="bk-prog-wrap" id="bk-prog-wrap" style="display:none;">
-      <div class="bk-prog-fill" id="bk-prog-fill" style="width:0%"><span id="bk-prog-txt">0%</span></div>
-    </div>
-    <div id="bk-log" style="font-family:'Space Mono',monospace;font-size:10px;max-height:120px;overflow-y:auto;padding:6px 20px;background:#f5f2ee;border-bottom:var(--b2);display:none;"></div>
-
-    <!-- per-person forms injected here -->
-    <div id="bk-forms"></div>
-  </div>
-</div>
-
 <!-- ═══════════════════ PAGE: FAST ENTRY ═══════════════════ -->
 <div class="page" id="pg-fast">
   <div class="chk-header">
     <div>
       <h2>FAST ENTRY</h2>
       <p>One row per person, straight off the paper. Tab moves across, Enter drops to the next row,
-         codes number themselves, and the address is typed once for the whole team.</p>
+         codes number themselves. Address fields start from the defaults below and are edited per person —
+         Ctrl+D copies the cell above when two people do share one.</p>
     </div>
     <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       <span id="fast-count" style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;letter-spacing:1px;"></span>
@@ -1952,7 +1834,7 @@ body.dense .av { width: 30px !important; height: 30px !important; }
     <!-- Everyone on a team shares these, so they are typed once up here
          rather than on every row. -->
     <div class="d-section" style="margin-bottom:14px;">
-      <div class="d-head">👥 THIS TEAM — TYPED ONCE, APPLIED TO EVERY ROW</div>
+      <div class="d-head">👥 DEFAULTS FOR NEW ROWS — EVERY ONE STAYS EDITABLE IN ITS OWN ROW</div>
       <div style="padding:12px 14px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
         <div class="fld" style="flex:0 1 120px;">
           <label for="fast-group">Team / code <span class="req">*</span></label>
@@ -1963,7 +1845,7 @@ body.dense .av { width: 30px !important; height: 30px !important; }
           <input id="fast-start" inputmode="numeric" placeholder="auto" oninput="fastRenumber()" />
         </div>
         <div class="fld" style="flex:0 1 170px;">
-          <label for="fast-state">State <span class="req">*</span></label>
+          <label for="fast-state">State</label>
           <select id="fast-state"><option value="">Select State</option></select>
         </div>
         <div class="fld" style="flex:0 1 150px;">
@@ -1998,6 +1880,13 @@ body.dense .av { width: 30px !important; height: 30px !important; }
             <th style="width:110px;">DOB <span class="req">*</span></th>
             <th style="width:56px;" title="Type m, f or o">SEX <span class="req">*</span></th>
             <th style="width:120px;">MOBILE <span class="req">*</span></th>
+            <th style="width:80px;">DOOR NO</th>
+            <th style="width:150px;">STREET</th>
+            <th style="width:120px;">CITY</th>
+            <th style="width:120px;">DISTRICT</th>
+            <th style="width:90px;">PINCODE</th>
+            <th style="width:130px;">STATE <span class="req">*</span></th>
+            <th style="width:56px;" title="This person's photo">PHOTO</th>
             <th style="width:100px;">STATUS</th>
             <th style="width:34px;"></th>
           </tr></thead>
@@ -2072,7 +1961,8 @@ body.dense .av { width: 30px !important; height: 30px !important; }
         <div class="fld" style="flex:0 1 150px;">
           <label for="staff-role">Role</label>
           <input id="staff-role" list="dl-staff-role" placeholder="Coordinator" />
-          <datalist id="dl-staff-role">
+          <datalist id="dl-fast-state"></datalist>
+      <datalist id="dl-staff-role">
             <option>Coordinator</option><option>Team In-charge</option>
             <option>Volunteer</option><option>Supervisor</option>
           </datalist>
@@ -2757,9 +2647,8 @@ function switchTab(tab) {
   const showSearch = tab==='list';
   document.getElementById('search-bar').style.display = showSearch?'':'none';
   document.getElementById('ai-drawer').classList.remove('open');
-  const pg = {list:'pg-list',detail:'pg-detail',register:'pg-register',bulk:'pg-bulk',checker:'pg-checker',stats:'pg-stats',teams:'pg-teams',staff:'pg-staff',fast:'pg-fast'}[tab];
+  const pg = {list:'pg-list',detail:'pg-detail',register:'pg-register',checker:'pg-checker',stats:'pg-stats',teams:'pg-teams',staff:'pg-staff',fast:'pg-fast'}[tab];
   if(pg) document.getElementById(pg).classList.add('active');
-  if(tab==='bulk') { measureChrome(); checkForDraft(); }
   if(tab==='stats') renderStats();
   if(tab==='teams') renderTeams();
   if(tab==='staff') renderStaff();
@@ -2769,12 +2658,6 @@ function switchTab(tab) {
 
 // Bulk page is a fixed-height flex layout — measure the real chrome instead of
 // assuming 60px (config bar + nav is closer to 124px, and wraps on narrow screens).
-function measureChrome(){
-  const h = (document.getElementById('cfg-bar')?.offsetHeight||0)
-          + (document.querySelector('.top-nav')?.offsetHeight||0);
-  document.documentElement.style.setProperty('--chrome-h', h+'px');
-}
-window.addEventListener('resize', measureChrome);
 
 // ════════════════════════════════════════════
 // SUPABASE
@@ -3916,7 +3799,7 @@ window.addEventListener('beforeunload', e => {
   e.returnValue = '';
 });
 document.addEventListener('input', e => {
-  if (e.target.closest('#pg-register, #bk-forms')) markDirty();
+  if (e.target.closest('#pg-register, #pg-fast')) markDirty();
 }, true);
 
 // ════════════════════════════════════════════
@@ -3948,8 +3831,7 @@ document.addEventListener('paste', e => {
     const text = (e.clipboardData?.getData('text') || '').trim();
     if (text.length < 12) return;
     const tab = activeTabName();
-    const prefix = tab === 'register' ? 'r-'
-                 : (tab === 'bulk' && bkCurrent >= 0 ? 'bk'+bkCurrent+'-' : null);
+    const prefix = tab === 'register' ? 'r-' : null;
     const box = prefix && document.getElementById(prefix + 'smart-paste');
     if (!box) return;
     e.preventDefault();
@@ -3964,16 +3846,6 @@ document.addEventListener('paste', e => {
   const r = new FileReader();
   r.onload = ev => {
     const url = ev.target.result;
-    // Inside a bulk person's form, or on the bulk tab: that person's slot.
-    const form = document.activeElement?.closest?.('.bk-person-form');
-    const slot = form ? parseInt(form.id.replace(/\D/g,''), 10)
-               : (activeTabName() === 'bulk' ? bkCurrent : -1);
-    if (form || activeTabName() === 'bulk') {
-      if (!(slot >= 0) || isNaN(slot)) { toast('ADD A PERSON FIRST','err'); return; }
-      bkInitAi(slot, url);
-      toast('IMAGE PASTED — RUN THE SCAN','ok');
-      return;
-    }
     switchTab('register');
     initAiEditor(url);
     toast('IMAGE PASTED — CROP, THEN RUN GEMINI SCAN','ok');
@@ -4815,579 +4687,6 @@ function exportPDF() {
   w.document.write(html);
   w.document.close();
   toast(`PDF ROSTER READY — ${displayRecords.length} RECORDS`, 'ok');
-}
-
-// ════════════════════════════════════════════
-// BULK REGISTER — one full form per person
-// Slots are permanent: deleting person 3 marks slot 3 dead rather than
-// splicing the array, so every other form keeps its DOM ids and state.
-// ════════════════════════════════════════════
-let bkPersons = [];   // {_name,_id,_saved,_deleted} indexed by permanent slot
-let bkCurrent = -1;
-const bkSt = {};      // per-slot editor state
-
-function bkState(i) {
-  if (!bkSt[i]) bkSt[i] = { aiEd:null, phEd:null, docEd:null, finalPhoto:null, finalDoc:null };
-  return bkSt[i];
-}
-function bkLive(){ return bkPersons.map((p,i)=>p&&!p._deleted?i:-1).filter(i=>i>=0); }
-function bkEl(i, field)  { return document.getElementById(`bk${i}-${field}`); }
-function bkVal(i, field) { return bkEl(i,field)?.value?.trim()||''; }
-
-// ── sidebar ───────────────────────────────────
-function bkRenderSidebar() {
-  const live = bkLive();
-  document.getElementById('bk-badge').textContent = live.length;
-  const list = document.getElementById('bk-list');
-  if (!live.length) {
-    list.innerHTML = `<div style="color:var(--muted-on-dark);font-family:'Space Mono',monospace;font-size:9px;text-align:center;padding:20px 8px;line-height:1.8;">USE BUTTONS<br>BELOW TO ADD</div>`;
-    document.getElementById('bk-empty').style.display = 'flex';
-    document.getElementById('bk-topbar').style.display = 'none';
-    return;
-  }
-  document.getElementById('bk-empty').style.display = 'none';
-  document.getElementById('bk-topbar').style.display = '';
-  list.innerHTML = '';
-  live.forEach((i, pos) => {
-    const p = bkPersons[i];
-    const photo = bkSt[i]?.finalPhoto;
-    const card = document.createElement('div');
-    card.className = 'bk-card' + (i===bkCurrent?' active':'') + (p._saved?' saved':'');
-    card.id = 'bkcard-'+i;
-    card.innerHTML = `
-      ${photo ? `<img class="bk-card-img" src="${escAttr(photo)}" alt="">` : `<div class="bk-card-ph">👤</div>`}
-      <div class="bk-card-info">
-        <div class="bk-card-name">${escHtml(p._name)}</div>
-        <div class="bk-card-id">${escHtml(p._id)}</div>
-      </div>
-      ${p._saved?'<div class="bk-card-sts">✅</div>':''}`;
-    const del = document.createElement('button');
-    del.className='bk-del-btn'; del.textContent='✕'; del.title='Remove person '+(pos+1);
-    del.onclick = e => { e.stopPropagation(); bkDelete(i); };
-    card.appendChild(del);
-    card.onclick = () => bkGoTo(i);
-    list.appendChild(card);
-  });
-}
-
-function bkUpdateCard(i) {
-  if (!bkPersons[i] || bkPersons[i]._deleted) return;
-  const name = [bkVal(i,'sevakName'),bkVal(i,'surName')].filter(Boolean).join(' ') || 'PERSON '+(bkLive().indexOf(i)+1);
-  const id   = bkVal(i,'idNumber') || '—';
-  bkPersons[i]._name = name; bkPersons[i]._id = id;
-  const card = document.getElementById('bkcard-'+i);
-  if (!card) return;
-  card.querySelector('.bk-card-name').textContent = name;
-  card.querySelector('.bk-card-id').textContent   = id;
-  const photo = bkSt[i]?.finalPhoto;
-  const old   = card.querySelector('.bk-card-img, .bk-card-ph');
-  if (old) {
-    if (photo) { const img=document.createElement('img'); img.className='bk-card-img'; img.src=photo; img.alt=''; old.replaceWith(img); }
-    else { const ph=document.createElement('div'); ph.className='bk-card-ph'; ph.textContent='👤'; old.replaceWith(ph); }
-  }
-  bkUpdateTopbar();
-}
-
-function bkUpdateTopbar() {
-  const live = bkLive();
-  const pos  = live.indexOf(bkCurrent);
-  document.getElementById('bk-counter').textContent = live.length ? `${pos+1} / ${live.length}` : '—';
-  document.getElementById('bk-prev').disabled = pos <= 0;
-  document.getElementById('bk-next').disabled = pos < 0 || pos >= live.length-1;
-  document.getElementById('bk-lbl').textContent = bkPersons[bkCurrent]?._name || '';
-}
-
-// ── navigation ────────────────────────────────
-function bkGoTo(i) {
-  document.getElementById(`bkform-${bkCurrent}`)?.classList.remove('active');
-  document.getElementById(`bkcard-${bkCurrent}`)?.classList.remove('active');
-  bkCurrent = i;
-  document.getElementById(`bkform-${i}`)?.classList.add('active');
-  const card = document.getElementById(`bkcard-${i}`);
-  card?.classList.add('active');
-  card?.scrollIntoView({behavior:'smooth',block:'nearest'});
-  bkUpdateTopbar();
-}
-
-function bkNav(dir) {
-  const live = bkLive();
-  const pos  = live.indexOf(bkCurrent) + dir;
-  if (pos >= 0 && pos < live.length) bkGoTo(live[pos]);
-}
-
-// ── add / delete ──────────────────────────────
-function bkAdd(photoDataUrl=null) {
-  const i = bkPersons.length;                     // slot ids never get reused
-  bkPersons.push({ _name:'PERSON '+(bkLive().length+1), _id:'—', _saved:false, _deleted:false });
-  bkSt[i] = { aiEd:null, phEd:null, docEd:null, finalPhoto:photoDataUrl, finalDoc:null };
-
-  document.getElementById('bk-forms').insertAdjacentHTML('beforeend', bkFormHtml(i));
-  bkWire(i);
-
-  if (photoDataUrl) setTimeout(() => { bkInitPhoto(i, photoDataUrl); bkInitAi(i, photoDataUrl); }, 50);
-
-  bkRenderSidebar();
-  bkGoTo(i);
-  markDirty();
-  return i;
-}
-
-function bkDelete(i) {
-  const pos = bkLive().indexOf(i);
-  if (!confirm(`Remove Person ${pos+1}${bkPersons[i]?._name?' — '+bkPersons[i]._name:''}?`)) return;
-  document.getElementById(`bkform-${i}`)?.remove();
-  bkPersons[i]._deleted = true;
-  delete bkSt[i];
-  if (bkCurrent === i) {
-    const live = bkLive();
-    bkCurrent = live.length ? live[Math.min(pos, live.length-1)] : -1;
-    if (bkCurrent >= 0) document.getElementById(`bkform-${bkCurrent}`)?.classList.add('active');
-  }
-  bkRenderSidebar();
-  bkUpdateTopbar();
-}
-
-function bkClearAll() {
-  if (bkLive().length && !confirm('Clear all persons? Unsaved work will be lost.')) return;
-  bkPersons = []; Object.keys(bkSt).forEach(k=>delete bkSt[k]); bkCurrent = -1;
-  document.getElementById('bk-forms').innerHTML = '';
-  document.getElementById('bk-log').style.display = 'none';
-  document.getElementById('bk-prog-wrap').style.display = 'none';
-  bkRenderSidebar(); bkUpdateTopbar(); clearDirty();
-}
-
-// ── import photos (kept in the order they were picked) ──
-async function bkImportPhotos(files) {
-  const list = [...files];
-  if (!list.length) return;
-  toast(`IMPORTING ${list.length} PHOTO${list.length>1?'S':''}…`, 'inf');
-  let coded = 0;
-  for (const f of list) {
-    const dataUrl = await new Promise(res => { const r=new FileReader(); r.onload=ev=>res(ev.target.result); r.readAsDataURL(f); });
-    const i = bkAdd(dataUrl);
-    const c = codeFromFilename(f.name);          // DD12.jpg → DD12
-    if (c) { const el = bkEl(i,'code'); if (el) { el.value = c; coded++; } }
-  }
-  document.getElementById('bk-photos-input').value = '';
-  if (coded) toast(`CODE READ FROM ${coded} FILENAME(S)`,'ok');
-}
-
-// ── form HTML ─────────────────────────────────
-function bkFormHtml(i) {
-  const p = `bk${i}`;
-  return `<div class="bk-person-form" id="bkform-${i}">
-
-  <div class="reg-section" style="border-left:none;border-right:none;border-top:none;margin:0;">
-    <div class="reg-sect-head"><span class="ico">🤖</span><div><h3>AI HANDWRITING RECOGNITION</h3><p>Upload handwritten form → Gemini scans → Fields auto-filled</p></div></div>
-    <div class="reg-sect-body">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
-        <div>
-          <div class="upload-zone" id="${p}-ai-zone">
-            <input type="file" id="${p}-ai-file" accept="image/*" aria-label="Upload handwritten form">
-            <div class="uz-ico">📄</div>
-            <p><strong>Click or drag &amp; drop</strong> handwritten form image</p>
-          </div>
-          <div class="img-editor" id="${p}-ai-editor">
-            <div class="editor-toolbar">
-              <span>EDIT:</span>
-              <button class="nb nb-ghost nb-sm" onclick="bkSt[${i}].aiEd?.rotate(-90)">↺ LEFT</button>
-              <button class="nb nb-ghost nb-sm" onclick="bkSt[${i}].aiEd?.rotate(90)">↻ RIGHT</button>
-              <button class="nb nb-ghost nb-sm" id="${p}-ai-crop-btn" onclick="bkSt[${i}].aiEd?.toggleCrop()">✂ CROP</button>
-              <button class="nb nb-yellow nb-sm" id="${p}-ai-apply-btn" style="display:none" onclick="bkSt[${i}].aiEd?.applyCrop()">✅ APPLY</button>
-              <button class="nb nb-ghost nb-sm" onclick="bkSt[${i}].aiEd?.reset()">↺ RESET</button>
-            </div>
-            <div class="canvas-wrap" id="${p}-ai-canvas-wrap"><canvas id="${p}-ai-canvas" class="ec"></canvas></div>
-            <div class="editor-footer">
-              <button class="nb nb-blue nb-sm" id="${p}-btn-ocr" onclick="bkRunOcr(${i})">🔍 RUN GEMINI SCAN</button>
-              <button class="nb nb-ghost nb-sm" onclick="openLens('bk',${i},'ai')" title="Pick text out of the image by hand">🔤 SELECT TEXT</button>
-              <span class="size-badge" id="${p}-ai-size"></span>
-            </div>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:12px;">
-          <div class="how-box"><strong>HOW IT WORKS:</strong><br>1️⃣ Upload handwritten form photo<br>2️⃣ Crop / rotate for clarity<br>3️⃣ Click <em>Run Gemini Scan</em><br>4️⃣ Fields auto-filled below<br>5️⃣ Verify &amp; correct before saving</div>
-          <div id="${p}-ocr-status" style="display:none;"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="reg-section" style="border-left:none;border-right:none;border-top:none;margin:0;">
-    <div class="reg-sect-head"><span class="ico">📝</span><div><h3>REGISTRATION DETAILS</h3><p>Fill manually or use AI above</p></div></div>
-    <div class="reg-sect-body">
-      <div class="fg">
-        <div class="fld" id="${p}-fld-idNumber"><label for="${p}-idNumber">ID / Aadhaar No <span class="req">*</span></label>
-          <input id="${p}-idNumber" placeholder="12-digit Aadhaar number" inputmode="numeric" oninput="bkUpdateCard(${i})">
-          <div class="dup-warn" id="dup-${p}-idNumber"></div>
-        </div>
-        <div class="fld" id="${p}-fld-code"><label for="${p}-code">Code <span class="req">*</span></label>
-          <div class="id-row">
-            <input id="${p}-code" list="dl-code" placeholder="e.g. CODE001">
-            <button class="mini-btn" type="button" onclick="fillNextCode('${p}-code')" title="Fill next code in sequence">⚡</button>
-          </div>
-        </div>
-        <div class="fld" id="${p}-fld-sevakName"><label for="${p}-sevakName">Sevak Name <span class="req">*</span></label><input id="${p}-sevakName" placeholder="First / Given Name" oninput="bkUpdateCard(${i})"></div>
-        <div class="fld"><label for="${p}-surName">Surname</label><input id="${p}-surName" placeholder="Last Name" oninput="bkUpdateCard(${i})"></div>
-        <div class="fld"><label for="${p}-fatherOrSpouseName">Father / Spouse Name</label><input id="${p}-fatherOrSpouseName" placeholder="Father or Spouse"></div>
-        <div class="fld" id="${p}-fld-dob"><label for="${p}-dob">Date of Birth <span class="req">*</span></label><input id="${p}-dob" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric"></div>
-        <div class="fld" id="${p}-fld-mobileNo"><label for="${p}-mobileNo">Mobile <span class="req">*</span></label>
-          <input id="${p}-mobileNo" type="tel" placeholder="10-digit mobile" maxlength="10">
-          <div class="dup-warn" id="dup-${p}-mobileNo"></div>
-        </div>
-        <div class="fld"><label for="${p}-email">Email</label><input id="${p}-email" type="email" placeholder="email@example.com"></div>
-        <div class="fld" id="${p}-fld-gender"><label for="${p}-gender">Gender <span class="req">*</span></label>
-          <select id="${p}-gender"><option value="">Select Gender</option><option>Male</option><option>Female</option><option>Other</option></select>
-        </div>
-        <div class="fld" id="${p}-fld-state"><label for="${p}-state">State <span class="req">*</span></label><select id="${p}-state"><option value="">Select State</option></select></div>
-        <div class="fld"><label for="${p}-district">District</label><input id="${p}-district" list="dl-district" placeholder="District"></div>
-        <div class="fld"><label for="${p}-city">City</label><input id="${p}-city" list="dl-city" placeholder="City / Town"></div>
-        <div class="fld"><label for="${p}-street">Street</label><input id="${p}-street" list="dl-street" placeholder="Street / Colony"></div>
-        <div class="fld"><label for="${p}-doorNo">Door No</label><input id="${p}-doorNo" placeholder="Door / Flat No."></div>
-        <div class="fld"><label for="${p}-pincode">Pincode</label><input id="${p}-pincode" placeholder="6-digit pincode" maxlength="6" inputmode="numeric"></div>
-      </div>
-      <div class="addr-paste-bar">
-        <textarea id="bk${i}-smart-paste" rows="2" aria-label="Paste details to split"
-          placeholder="Paste name, Aadhaar, DOB, gender, mobile, address…"></textarea>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;width:100%;">
-          <button class="nb nb-blue nb-sm" onclick="applySmartPaste('bk${i}-')">✂ SPLIT INTO FIELDS</button>
-          <button class="nb nb-black nb-sm" onclick="openLensFromPaste('bk${i}-')">🔤 SELECT TEXT FROM IMAGE</button>
-        </div>
-      </div>
-      <div class="addr-bar">
-        <button class="nb nb-blue nb-sm" onclick="bkRunAddrFill(${i})">🌐 SMART-FILL ADDRESS</button>
-        <p>Fixes spelling · Fills missing address fields using Gemini</p>
-        <span id="${p}-addr-status"></span>
-      </div>
-    </div>
-  </div>
-
-  <div class="reg-section" style="border-left:none;border-right:none;border-top:none;margin:0;">
-    <div class="reg-sect-head"><span class="ico">📸</span><div><h3>PHOTO</h3><p>Crop &amp; rotate · Compressed automatically on save</p></div></div>
-    <div class="reg-sect-body">
-      <div class="media-grid">
-        <div>
-          <div class="upload-zone" id="${p}-ph-zone">
-            <input type="file" id="${p}-ph-file" accept="image/*" aria-label="Upload photo">
-            <div class="uz-ico">🖼️</div>
-            <p><strong>Click</strong> to select photo</p>
-          </div>
-          <div class="img-editor" id="${p}-ph-editor">
-            <div class="editor-toolbar">
-              <span>EDIT:</span>
-              <button class="nb nb-ghost nb-sm" onclick="bkSt[${i}].phEd?.rotate(-90)">↺ LEFT</button>
-              <button class="nb nb-ghost nb-sm" onclick="bkSt[${i}].phEd?.rotate(90)">↻ RIGHT</button>
-              <button class="nb nb-ghost nb-sm" id="${p}-ph-crop-btn" onclick="bkSt[${i}].phEd?.toggleCrop()">✂ CROP</button>
-              <button class="nb nb-yellow nb-sm" id="${p}-ph-apply-btn" style="display:none" onclick="bkSt[${i}].phEd?.applyCrop()">✅ APPLY CROP</button>
-              <button class="nb nb-ghost nb-sm" onclick="bkSt[${i}].phEd?.reset()">↺ RESET</button>
-            </div>
-            <div class="canvas-wrap" id="${p}-ph-canvas-wrap"><canvas id="${p}-ph-canvas" class="ec"></canvas></div>
-            <div class="editor-footer">
-              <span class="size-badge" id="${p}-ph-size"></span>
-              <button class="nb nb-orange nb-sm" onclick="bkCompressPhoto(${i})">⚡ COMPRESS</button>
-            </div>
-          </div>
-        </div>
-        <div class="preview-box" id="${p}-ph-preview" onclick="bkLightbox(${i},'photo')">
-          <span>No photo selected</span><div class="zoom-hint">🔍 CLICK TO VIEW FULL SIZE</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="reg-section" style="border-left:none;border-right:none;border-top:none;margin:0;">
-    <div class="reg-sect-head"><span class="ico">🪪</span><div><h3>DOCUMENT / ID IMAGE</h3><p>Saved to its own column</p></div></div>
-    <div class="reg-sect-body">
-      <div class="media-grid">
-        <div>
-          <div class="upload-zone" id="${p}-doc-zone">
-            <input type="file" id="${p}-doc-file" accept="image/*" aria-label="Upload document">
-            <div class="uz-ico">🪪</div>
-            <p><strong>Click</strong> to select document</p>
-          </div>
-          <div class="img-editor" id="${p}-doc-editor">
-            <div class="editor-toolbar">
-              <span>EDIT:</span>
-              <button class="nb nb-ghost nb-sm" onclick="bkSt[${i}].docEd?.rotate(-90)">↺ LEFT</button>
-              <button class="nb nb-ghost nb-sm" onclick="bkSt[${i}].docEd?.rotate(90)">↻ RIGHT</button>
-              <button class="nb nb-ghost nb-sm" id="${p}-doc-crop-btn" onclick="bkSt[${i}].docEd?.toggleCrop()">✂ CROP</button>
-              <button class="nb nb-yellow nb-sm" id="${p}-doc-apply-btn" style="display:none" onclick="bkSt[${i}].docEd?.applyCrop()">✅ APPLY</button>
-              <button class="nb nb-ghost nb-sm" onclick="bkSt[${i}].docEd?.reset()">↺ RESET</button>
-            </div>
-            <div class="canvas-wrap" id="${p}-doc-canvas-wrap"><canvas id="${p}-doc-canvas" class="ec"></canvas></div>
-            <div class="editor-footer">
-              <span class="size-badge" id="${p}-doc-size"></span>
-              <button class="nb nb-blue nb-sm" onclick="openLens('bk',${i},'doc')" title="Pick text out of the document">🔤 SELECT TEXT</button>
-              <button class="nb nb-orange nb-sm" onclick="bkCompressDoc(${i})">⚡ COMPRESS</button>
-            </div>
-          </div>
-        </div>
-        <div class="preview-box" id="${p}-doc-preview" onclick="bkLightbox(${i},'doc')">
-          <span>No document selected</span><div class="zoom-hint">🔍 CLICK TO VIEW FULL SIZE</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-</div>`;
-}
-
-// ── wire events for a newly created form ──────
-function bkWire(i) {
-  const p = `bk${i}`, st = bkState(i);
-  attachDobMask(bkEl(i,'dob'));
-  wireDupWatch(bkEl(i,'idNumber'), 'idNumber');
-  wireDupWatch(bkEl(i,'mobileNo'), 'mobileNo');
-  wireEntryHelpers(f => bkEl(i, f));
-
-  // A person added after load gets an empty state dropdown otherwise
-  populateStateSelects();
-
-  // Bulk had no pincode check at all — the register page and the modal both do
-  const pinEl = bkEl(i,'pincode');
-  if (pinEl && !pinEl._pinWatch) {
-    pinEl._pinWatch = 1;
-    let pt;
-    pinEl.addEventListener('input', () => { clearTimeout(pt); pt = setTimeout(() => bkPinCheck(i), 600); });
-  }
-
-  document.getElementById(`${p}-ai-file`).onchange = e => {
-    const f=e.target.files[0]; if(!f) return;
-    const r=new FileReader();
-    r.onload = ev => bkInitAi(i, ev.target.result);
-    r.readAsDataURL(f);
-  };
-  document.getElementById(`${p}-ph-file`).onchange = e => {
-    const f=e.target.files[0]; if(!f) return;
-    const r=new FileReader();
-    r.onload = ev => bkInitPhoto(i, ev.target.result);
-    r.readAsDataURL(f);
-  };
-  document.getElementById(`${p}-doc-file`).onchange = e => {
-    const f=e.target.files[0]; if(!f) return;
-    const r=new FileReader();
-    r.onload = ev => bkInitDoc(i, ev.target.result);
-    r.readAsDataURL(f);
-  };
-}
-
-// ── photo/doc/ai init ─────────────────────────
-function bkSetPreview(id, src){
-  document.getElementById(id).innerHTML =
-    `<img src="${escAttr(src)}" alt=""><div class="zoom-hint">🔍 CLICK TO VIEW FULL SIZE</div>`;
-}
-function bkInitPhoto(i, dataUrl) {
-  const p=`bk${i}`, st=bkState(i);
-  st.finalPhoto = dataUrl;
-  document.getElementById(`${p}-ph-editor`).classList.add('show');
-  bkSetPreview(`${p}-ph-preview`, dataUrl);
-  if (!st.phEd) {
-    st.phEd = new ImageEditor({
-      canvasId:`${p}-ph-canvas`, wrapId:`${p}-ph-canvas-wrap`,
-      cropBtnId:`${p}-ph-crop-btn`, applyBtnId:`${p}-ph-apply-btn`, sizeBadgeId:`${p}-ph-size`,
-      onCompressed: raw => { st.finalPhoto = raw; bkSetPreview(`${p}-ph-preview`, raw); bkUpdateCard(i); }
-    });
-  }
-  st.phEd.load(dataUrl);
-  bkUpdateCard(i); markDirty();
-}
-
-function bkInitDoc(i, dataUrl) {
-  const p=`bk${i}`, st=bkState(i);
-  st.finalDoc = dataUrl;
-  document.getElementById(`${p}-doc-editor`).classList.add('show');
-  bkSetPreview(`${p}-doc-preview`, dataUrl);
-  if (!st.docEd) {
-    st.docEd = new ImageEditor({
-      canvasId:`${p}-doc-canvas`, wrapId:`${p}-doc-canvas-wrap`,
-      cropBtnId:`${p}-doc-crop-btn`, applyBtnId:`${p}-doc-apply-btn`, sizeBadgeId:`${p}-doc-size`,
-      onCompressed: raw => { st.finalDoc = raw; bkSetPreview(`${p}-doc-preview`, raw); }
-    });
-  }
-  st.docEd.load(dataUrl); markDirty();
-}
-
-function bkInitAi(i, dataUrl) {
-  const p=`bk${i}`, st=bkState(i);
-  document.getElementById(`${p}-ai-editor`).classList.add('show');
-  if (!st.aiEd) {
-    st.aiEd = new ImageEditor({
-      canvasId:`${p}-ai-canvas`, wrapId:`${p}-ai-canvas-wrap`,
-      cropBtnId:`${p}-ai-crop-btn`, applyBtnId:`${p}-ai-apply-btn`, sizeBadgeId:`${p}-ai-size`
-    });
-  }
-  st.aiEd.load(dataUrl);
-}
-
-async function bkCompressPhoto(i) {
-  const st=bkState(i), p=`bk${i}`;
-  if (!st.phEd) { toast('LOAD A PHOTO FIRST','err'); return; }
-  const {base64,bytes} = await compressBlob(st.phEd.getJpeg());
-  st.finalPhoto = base64;
-  bkSetPreview(`${p}-ph-preview`, base64);
-  document.getElementById(`${p}-ph-size`).textContent = fmtKB(bytes)+' (compressed)';
-  bkUpdateCard(i);
-  toast(`COMPRESSED TO ${fmtKB(bytes)}`,'ok');
-}
-
-async function bkCompressDoc(i) {
-  const st=bkState(i), p=`bk${i}`;
-  if (!st.docEd) { toast('LOAD A DOCUMENT FIRST','err'); return; }
-  const {base64,bytes} = await compressBlob(st.docEd.getJpeg(),80);
-  st.finalDoc = base64;
-  bkSetPreview(`${p}-doc-preview`, base64);
-  document.getElementById(`${p}-doc-size`).textContent = fmtKB(bytes)+' (compressed)';
-  toast(`COMPRESSED TO ${fmtKB(bytes)}`,'ok');
-}
-
-function bkLightbox(i, type) {
-  showLightbox(type==='photo' ? bkSt[i]?.finalPhoto : bkSt[i]?.finalDoc);
-}
-
-// ── AI OCR per person ─────────────────────────
-async function bkRunOcr(i) {
-  const gemKey = document.getElementById('cfg-gemini').value.trim();
-  if (!gemKey) { toast('ENTER GEMINI API KEY IN CONFIG','err'); return; }
-  const st=bkState(i), p=`bk${i}`;
-  if (!st.aiEd) { toast('UPLOAD A FORM IMAGE FIRST','err'); return; }
-
-  const sEl = document.getElementById(`${p}-ocr-status`);
-  sEl.style.display='flex'; sEl.className='ai-status proc';
-  sEl.innerHTML='<div class="spinner"></div><span>Gemini is reading the handwriting…</span>';
-  document.getElementById(`${p}-btn-ocr`).disabled=true;
-  const task = aiProgressStart('GEMINI OCR — READING HANDWRITING…','🔍',12000);
-
-  try {
-    const text = await geminiVision(gemKey, st.aiEd.getDataUrl(), OCR_PROMPT);
-    const filled = applyOcrFields(parseGeminiJson(text), `${p}-`);
-    bkUpdateCard(i);
-    sEl.className='ai-status done';
-    sEl.innerHTML=`✅ Gemini filled <strong>${filled}</strong> fields. Verify before saving.`;
-    aiProgressEnd(task,`AI FILLED ${filled} FIELDS`,'✅');
-    toast(`AI FILLED ${filled} FIELDS`,'ok'); markDirty();
-  } catch(e) {
-    sEl.className='ai-status fail'; sEl.textContent='❌ '+e.message;
-    aiProgressEnd(task,'OCR ERROR','❌'); toast('OCR ERROR: '+e.message,'err');
-  }
-  document.getElementById(`${p}-btn-ocr`).disabled=false;
-}
-
-// ── address smart-fill per person ─────────────
-async function bkRunAddrFill(i) {
-  const gemKey = document.getElementById('cfg-gemini').value.trim();
-  if (!gemKey) { toast('ENTER GEMINI API KEY IN CONFIG','err'); return; }
-  const p=`bk${i}`;
-  const state=bkVal(i,'state'), district=bkVal(i,'district'), city=bkVal(i,'city'), pincode=bkVal(i,'pincode');
-  if (!state&&!district&&!city&&!pincode) { toast('ENTER AT LEAST ONE ADDRESS FIELD FIRST','err'); return; }
-
-  const stEl = document.getElementById(`${p}-addr-status`);
-  stEl.innerHTML='<span style="color:var(--blue);">⏳ AI CHECKING…</span>';
-  const task = aiProgressStart('GEMINI SMART-FILL — VERIFYING ADDRESS…','🌐',6000);
-
-  try {
-    const payload={contents:[{parts:[{text:`You are an expert on Indian geography.
-Fix spelling and fill missing address fields. Return ONLY JSON:
-{"state":null,"district":null,"city":null,"pincode":null}
-Current: state="${state}", district="${district}", city="${city}", pincode="${pincode}". NO markdown.`}]}],generationConfig:{temperature:0.1,maxOutputTokens:300}};
-    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gemKey}`,
-      {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Gemini error '+res.status);}
-    const data=await res.json();
-    const txt=(data.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join('');
-    const fields=parseGeminiJson(txt);
-    let n=0;
-    ['state','district','city','pincode'].forEach(k=>{
-      if(fields[k]&&fields[k]!=='null'){
-        const el=bkEl(i,k);
-        if(el&&el.value.trim()!==fields[k]){el.value=fields[k];flash(el);n++;}
-      }
-    });
-    stEl.innerHTML=n>0?`<span style="color:var(--green);">✅ ${n} FIELD(S) CORRECTED</span>`:'<span style="color:#888;">✅ ADDRESS LOOKS CORRECT</span>';
-    aiProgressEnd(task,n>0?`${n} CORRECTED`:'ADDRESS OK','✅');
-  } catch(e) {
-    stEl.innerHTML=`<span style="color:var(--red);">❌ ${escHtml(e.message)}</span>`;
-    aiProgressEnd(task,'ADDRESS AI ERROR','❌');
-  }
-}
-
-// ── save all ──────────────────────────────────
-async function bkSaveAll() {
-  if (!SB_URL) { toast('CONNECT TO SUPABASE FIRST','err'); return; }
-  const live = bkLive().filter(i => !bkPersons[i]._saved);
-  if (!live.length) { toast(bkLive().length?'EVERYTHING IS ALREADY SAVED':'NO PERSONS TO SAVE','err'); return; }
-
-  let errors=0, firstBad=-1;
-  live.forEach(i=>{
-    REQUIRED_FIELDS.forEach(f=>{
-      const fld=document.getElementById(`bk${i}-fld-${f}`);
-      if(!bkVal(i,f)) { fld?.classList.add('berr'); errors++; if(firstBad<0) firstBad=i; }
-      else fld?.classList.remove('berr');
-    });
-  });
-  if (errors) {
-    toast(`${errors} REQUIRED FIELD${errors>1?'S':''} MISSING — SEE RED FIELDS`,'err');
-    if(firstBad>=0) bkGoTo(firstBad);
-    return;
-  }
-
-  const saveBtn = document.getElementById('bk-save-all');
-  saveBtn.disabled=true; saveBtn.textContent='⏳ SAVING…';
-  const prog=document.getElementById('bk-prog-wrap'), fill=document.getElementById('bk-prog-fill'), txt=document.getElementById('bk-prog-txt');
-  const log=document.getElementById('bk-log');
-  prog.style.display=''; log.style.display=''; log.innerHTML='';
-
-  const addLog = (color, msg) => {
-    const d=document.createElement('div'); d.style.color=color; d.textContent=msg;
-    log.appendChild(d); log.scrollTop=log.scrollHeight;
-  };
-
-  let saved=0,failed=0,updated=0;
-  for(let n=0;n<live.length;n++){
-    const i=live[n];
-    const pct=Math.round(n/live.length*100);
-    fill.style.width=pct+'%'; txt.textContent=`${pct}% — saving ${n+1}/${live.length}`;
-    bkGoTo(i);
-
-    const st=bkState(i);
-    const raw={};
-    DATA_FIELDS.forEach(k=>{const v=bkVal(i,k);if(v)raw[k]=v;});
-    raw.dob=normDob(raw.dob); raw.gender=normGender(raw.gender);
-    try{
-      if(st.finalPhoto) raw.photoBase64=(await compressBlob(st.finalPhoto,30)).base64;
-      if(st.finalDoc)   raw.docBase64  =(await compressBlob(st.finalDoc,80)).base64;
-    }catch(_){}
-    const data=filterToColumns(raw);
-    const label=`[${n+1}] ${raw.sevakName||''} ${raw.surName||''} (${raw.idNumber})`.trim();
-
-    try {
-      // A PATCH that matches nothing returns 200 + [] — the old code read that as
-      // success and never inserted, silently discarding every new person.
-      const res = await upsertByIdNumber(data);
-      saved++; bkPersons[i]._saved=true;
-      if(res.action==='updated'){
-        updated++;
-        addLog('#1A56FF', `↻ UPDATED EXISTING ${label}${res.count>1?` — WARNING: ${res.count} rows share this ID`:''}`);
-      } else {
-        addLog('#00C16A', `✅ INSERTED ${label}`);
-      }
-      const card=document.getElementById('bkcard-'+i);
-      if(card){card.classList.add('saved');}
-    } catch(e) {
-      failed++;
-      addLog('#E63030', `❌ ${label} — ${e.message}`);
-    }
-  }
-
-  bkRenderSidebar();
-  fill.style.width='100%';
-  txt.textContent=`Done — ${saved} saved (${updated} updated existing)${failed?`, ${failed} failed`:''}`;
-  saveBtn.disabled=false; saveBtn.textContent='🚀 SAVE ALL';
-  toast(`BULK SAVE: ${saved} SAVED${failed?`, ${failed} FAILED`:''}`, saved>0?'ok':'err');
-  await fetchAll();
-  if(!failed){
-    clearDirty();
-    await idbDel('bulkDraft'); setDraftStatus('');
-    if(confirm(`All ${saved} records saved. Clear for the next batch?`)) bkClearAll();
-  }
 }
 
 // ════════════════════════════════════════════
@@ -6390,9 +5689,22 @@ function parseSeq(s) {
   const m = /^(.*?)(\d+)\s*$/.exec(String(s==null?'':s).trim());
   return m ? { prefix: m[1], num: parseInt(m[2],10), pad: m[2].length } : null;
 }
+// The group most of the registry already uses — the sensible default when a
+// new sheet opens. It lived with the bulk queue's code assigner; the fast grid
+// is what needs it now.
+function mostCommonGroup() {
+  const counts = {};
+  allRecords.forEach(r => { const g = codeGroup(r.code); if (g && g !== NO_CODE) counts[g] = (counts[g]||0)+1; });
+  const e = Object.entries(counts).sort((a,b) => b[1]-a[1])[0];
+  return e ? e[0] : '';
+}
+
 function allKnownCodes() {
   const codes = allRecords.map(r => r.code).filter(Boolean);
-  bkLive().forEach(i => { const v = bkVal(i,'code'); if (v) codes.push(v); });
+  // Codes sitting in the fast grid count as taken — otherwise the numbering
+  // hands the same code to the next sheet before this one is saved.
+  if (typeof fastRows === 'function')
+    fastRows().forEach(r => { const v = fastVal(r,'code'); if (v) codes.push(v); });
   return codes;
 }
 function computeNextCode(prefixHint) {
@@ -6444,14 +5756,14 @@ function checkDupField(el, field) {
     return rv && rv === norm && String(r.id) !== String(editRowId==null?'':editRowId);
   });
 
-  // also collides with another unsaved person in the bulk queue
+  // also collides with someone typed into the fast grid but not yet saved
   let bulkHit = null;
-  const mySlot = el.id.startsWith('bk') ? parseInt(el.id.slice(2),10) : -1;
-  for (const i of bkLive()) {
-    if (i === mySlot) continue;
-    const other = bkVal(i, field);
-    const on = field === 'mobileNo' ? other.replace(/\D/g,'') : other.toLowerCase();
-    if (on && on === norm) { bulkHit = i; break; }
+  if (typeof fastRows === 'function') {
+    for (const i of fastRows()) {
+      const other = fastVal(i, field);
+      const on = field === 'mobileNo' ? other.replace(/\D/g,'') : other.toLowerCase();
+      if (on && on === norm) { bulkHit = i; break; }
+    }
   }
 
   if (!hit && bulkHit === null) return;
@@ -6465,7 +5777,7 @@ function checkDupField(el, field) {
     a.onclick = () => openDetail(hit);
     box.appendChild(a);
   } else {
-    box.textContent = `⚠ Same value as person ${bkLive().indexOf(bulkHit)+1} in this batch`;
+    box.textContent = `⚠ Same value as row ${fastRows().indexOf(bulkHit)+1} in the fast grid`;
   }
 }
 function wireDupWatch(el, field) {
@@ -6474,116 +5786,6 @@ function wireDupWatch(el, field) {
   let t;
   el.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => checkDupField(el, field), 350); });
   el.addEventListener('blur', () => checkDupField(el, field));
-}
-
-// ════════════════════════════════════════════════════════════════
-// BULK: COPY FROM PREVIOUS / APPLY TO ALL / SCAN ALL
-// ════════════════════════════════════════════════════════════════
-const CARRY_FIELDS = ['code','state','district','city','street','pincode'];
-
-function bkCopyPrev() {
-  const live = bkLive(); const pos = live.indexOf(bkCurrent);
-  if (pos < 1) { toast('NO PREVIOUS PERSON TO COPY FROM','err'); return; }
-  const prev = live[pos-1];
-  let n = 0;
-  CARRY_FIELDS.forEach(f => {
-    const src = bkVal(prev, f), el = bkEl(bkCurrent, f);
-    if (src && el && el.value.trim() !== src) { el.value = src; flash(el); n++; }
-  });
-  bkUpdateCard(bkCurrent); markDirty();
-  toast(n ? `COPIED ${n} FIELD(S) FROM PERSON ${pos}` : 'NOTHING NEW TO COPY', n ? 'ok' : 'inf');
-}
-
-function bkApplyToAll() {
-  if (bkCurrent < 0) return;
-  const src = {};
-  CARRY_FIELDS.forEach(f => { const v = bkVal(bkCurrent, f); if (v) src[f] = v; });
-  const keys = Object.keys(src);
-  if (!keys.length) { toast('FILL CODE / ADDRESS ON THIS PERSON FIRST','err'); return; }
-  const others = bkLive().filter(i => i !== bkCurrent);
-  if (!others.length) { toast('ONLY ONE PERSON IN THE QUEUE','err'); return; }
-  if (!confirm(`Copy ${keys.join(', ')} from this person to the other ${others.length} in the queue?\n\nExisting values there will be overwritten.`)) return;
-  let n = 0;
-  others.forEach(i => {
-    keys.forEach(f => { const el = bkEl(i, f); if (el && el.value.trim() !== src[f]) { el.value = src[f]; n++; } });
-    bkUpdateCard(i);
-  });
-  markDirty();
-  toast(`UPDATED ${n} FIELD(S) ACROSS ${others.length} PERSONS`,'ok');
-}
-
-async function bkScanAll() {
-  const gemKey = document.getElementById('cfg-gemini').value.trim();
-  if (!gemKey) { toast('ENTER GEMINI API KEY IN CONFIG','err'); return; }
-  const targets = bkLive().filter(i => bkSt[i]?.aiEd && !bkPersons[i]._saved);
-  if (!targets.length) { toast('NO FORM IMAGES LOADED IN THE QUEUE','err'); return; }
-  if (!confirm(`Run Gemini on ${targets.length} form image(s)?\n\nFields the AI can read will be overwritten.`)) return;
-  const btn = document.getElementById('bk-scan-all');
-  btn.disabled = true;
-  for (let n = 0; n < targets.length; n++) {
-    btn.textContent = `⏳ ${n+1} / ${targets.length}`;
-    bkGoTo(targets[n]);
-    await bkRunOcr(targets[n]);
-  }
-  btn.disabled = false; btn.textContent = '🔍 SCAN ALL FORMS';
-  toast(`BATCH SCAN COMPLETE — ${targets.length} FORMS`,'ok');
-}
-
-// ════════════════════════════════════════════════════════════════
-// BULK DRAFT AUTOSAVE
-// ════════════════════════════════════════════════════════════════
-let _draftTimer = null;
-function scheduleDraftSave() {
-  clearTimeout(_draftTimer);
-  _draftTimer = setTimeout(saveBulkDraft, 1500);
-}
-async function saveBulkDraft() {
-  const live = bkLive();
-  if (!live.length) { await idbDel('bulkDraft'); setDraftStatus(''); return; }
-  const draft = {
-    savedAt: Date.now(),
-    persons: live.map(i => ({
-      fields: Object.fromEntries(DATA_FIELDS.map(f => [f, bkVal(i,f)])),
-      photo: bkSt[i]?.finalPhoto || null,
-      doc:   bkSt[i]?.finalDoc   || null,
-      saved: !!bkPersons[i]._saved
-    }))
-  };
-  const ok = await idbSet('bulkDraft', draft);
-  setDraftStatus(ok ? '💾 draft saved ' + new Date().toLocaleTimeString() : '⚠ draft not available');
-}
-function setDraftStatus(t) {
-  const el = document.getElementById('bk-save-status');
-  if (el) el.textContent = t;
-}
-async function checkForDraft() {
-  const d = await idbGet('bulkDraft');
-  const btn = document.getElementById('bk-restore-draft');
-  if (!btn) return;
-  if (d && d.persons?.length && !bkLive().length) {
-    btn.style.display = 'inline-flex';
-    btn.textContent = `♻ RESTORE DRAFT — ${d.persons.length} PERSON(S), ${new Date(d.savedAt).toLocaleString()}`;
-  } else {
-    btn.style.display = 'none';
-  }
-}
-async function restoreBulkDraft() {
-  const d = await idbGet('bulkDraft');
-  if (!d?.persons?.length) { toast('NO DRAFT FOUND','err'); return; }
-  for (const p of d.persons) {
-    const i = bkAdd(p.photo || null);
-    DATA_FIELDS.forEach(f => { const el = bkEl(i,f); if (el && p.fields[f]) el.value = p.fields[f]; });
-    if (p.doc) bkInitDoc(i, p.doc);
-    bkUpdateCard(i);
-  }
-  document.getElementById('bk-restore-draft').style.display = 'none';
-  toast(`RESTORED ${d.persons.length} PERSON(S) FROM DRAFT`,'ok');
-}
-async function discardBulkDraft() {
-  if (!confirm('Discard the saved draft?')) return;
-  await idbDel('bulkDraft');
-  await checkForDraft();
-  toast('DRAFT DISCARDED','inf');
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -7116,7 +6318,7 @@ function isTypingTarget(t) {
   return t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
 }
 function advanceField(el) {
-  const scope = el.closest('.bk-person-form') || el.closest('#pg-register') || el.closest('.modal');
+  const scope = el.closest('#pg-register') || el.closest('.modal');
   if (!scope) return;
   const fields = [...scope.querySelectorAll('input:not([type=file]):not([type=checkbox]), select')]
     .filter(f => f.offsetParent !== null && !f.disabled);
@@ -7149,14 +6351,10 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     if (document.getElementById('form-overlay').classList.contains('open')) saveRecord();
     else if (tab === 'register') submitForm();
-    else if (tab === 'bulk') bkSaveAll();
+    else if (tab === 'fast') fastSaveAll();
     return;
   }
-  if (mod && e.key === 'Enter' && tab === 'bulk') { e.preventDefault(); bkSaveAll(); return; }
-  if (mod && e.key.toLowerCase() === 'd' && tab === 'bulk') { e.preventDefault(); bkCopyPrev(); return; }
-  if (mod && tab === 'bulk' && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
-    e.preventDefault(); bkNav(e.key === 'ArrowRight' ? 1 : -1); return;
-  }
+  if (mod && e.key === 'Enter' && tab === 'fast') { e.preventDefault(); fastSaveAll(); return; }
   if (e.key === '/' && !isTypingTarget(e.target) && !document.querySelector('.overlay.open')) {
     e.preventDefault(); switchTab('list');
     const s = document.getElementById('search-input'); s.focus(); s.select();
@@ -7164,7 +6362,7 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Enter' && !mod && !e.shiftKey && isTypingTarget(e.target)
       && e.target.tagName === 'INPUT'
-      && (e.target.closest('#pg-register') || e.target.closest('.bk-person-form'))) {
+      && e.target.closest('#pg-register')) {
     e.preventDefault(); advanceField(e.target);
   }
 });
@@ -7185,12 +6383,8 @@ wireDupWatch(document.getElementById('r-mobileNo'), 'mobileNo');
 wireDupWatch(document.getElementById('f-idNumber'), 'idNumber');
 wireDupWatch(document.getElementById('f-mobileNo'), 'mobileNo');
 
-// Autosave the bulk queue as it is edited
-document.addEventListener('input', e => { if (e.target.closest('#bk-forms')) scheduleDraftSave(); }, true);
-
 loadTrash();
 loadViews();
-checkForDraft();
 
 // ════════════════════════════════════════════════════════════════
 // TEAMS — one team per code. The first member (lowest ID in that code)
@@ -8113,66 +7307,6 @@ function toggleFastMode() {
 }
 
 // ════════════════════════════════════════════════════════════════
-// BULK: assign a run of codes to the whole queue
-// ════════════════════════════════════════════════════════════════
-function mostCommonGroup() {
-  const counts = {};
-  allRecords.forEach(r => { const g = codeGroup(r.code); if (g && g !== NO_CODE) counts[g] = (counts[g]||0)+1; });
-  const e = Object.entries(counts).sort((a,b) => b[1]-a[1])[0];
-  return e ? e[0] : '';
-}
-function bkAssignCodes() {
-  const live = bkLive().filter(i => !bkPersons[i]._saved);
-  if (!live.length) { toast('NOBODY IN THE QUEUE TO CODE','err'); return; }
-  const guess = mostCommonGroup();
-  const g = prompt(`Assign a run of codes to ${live.length} person(s).\n\nTeam group (e.g. DD):`, guess);
-  if (g == null) return;
-  const grp = g.trim();
-  if (!grp) { toast('NO GROUP GIVEN','err'); return; }
-  const filled = live.filter(i => bkVal(i,'code'));
-  if (filled.length && !confirm(`${filled.length} of them already have a code. Overwrite everything with a fresh ${grp} run?`)) return;
-
-  live.forEach(i => { const el = bkEl(i,'code'); if (el) el.value = ''; });   // clear first so numbering is clean
-  let last = '';
-  live.forEach(i => {
-    const el = bkEl(i,'code');
-    if (!el) return;
-    const next = computeNextCode(grp);
-    el.value = next; flash(el);
-    last = next;
-  });
-  markDirty(); scheduleDraftSave();
-  toast(`CODED ${live.length} PERSON(S) UP TO ${last}`,'ok');
-}
-
-// ════════════════════════════════════════════════════════════════
-// BULK: read the code out of the photo filename
-// DD12.jpg / SVK-0042.png / dd_7 (1).jpg  →  DD12 / SVK-0042 / DD7
-// ════════════════════════════════════════════════════════════════
-function codeFromFilename(fn) {
-  let base = String(fn||'').replace(/\.[^.]+$/,'').replace(/\s*\(\d+\)\s*$/,'').trim();
-  base = base.replace(/[^A-Za-z0-9\-_ ]/g,' ').trim();
-  if (!base) return '';
-  // camera and messenger filenames carry a date, not a code
-  const segs = base.split(/[\s_]+/).filter(Boolean);
-  let cand = segs[segs.length-1];
-  if (!/[A-Za-z]/.test(cand) && segs.length > 1) cand = segs[segs.length-2] + '_' + cand;
-  const letters = (cand.match(/^[A-Za-z]+/) || [''])[0];
-  if (/^(img|dsc|dscn|pxl|photo|scan|image|wa|screenshot|whatsapp)$/i.test(letters)) return '';
-  cand = cand.replace(/\s+/g,'');
-  return /^[A-Za-z][A-Za-z0-9\-_]*\d{1,6}$/.test(cand) ? cand.toUpperCase() : '';
-}
-
-// ── fast-entry init ─────────────────────────────────────────────
-installLocks();
-loadSticky();
-wireEntryHelpers(f => document.getElementById('r-'+f));
-wireEntryHelpers(f => document.getElementById('f-'+f));
-document.getElementById('r-smart-paste').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); applySmartPaste('r-'); }
-});
-
-// ════════════════════════════════════════════════════════════════
 // TEXT SELECT ("Lens") — Tesseract.js gives per-word bounding boxes,
 // which get drawn as tappable regions over the image. Best on printed
 // documents: Aadhaar cards, typed member lists, government letters.
@@ -8210,9 +7344,7 @@ const lens = {
 };
 
 function lensEditorFor(scope, idx, kind) {
-  if (scope === 'reg') return kind === 'doc' ? docEd : aiEd;
-  const st = bkSt[idx];
-  return st ? (kind === 'doc' ? st.docEd : st.aiEd) : null;
+  return kind === 'doc' ? docEd : aiEd;
 }
 
 async function openLens(scope, idx, kind) {
@@ -8386,10 +7518,6 @@ function lensFill(append) {
   el.dispatchEvent(new Event('input', { bubbles: true }));
   el.dispatchEvent(new Event('blur'));
   flash(el);
-  if (lens.prefix.startsWith('bk')) {
-    const i = parseInt(lens.prefix.slice(2), 10);
-    if (!isNaN(i)) bkUpdateCard(i);
-  }
   markDirty();
   toast(`${f.toUpperCase()} FILLED`,'ok');
 }
@@ -8609,10 +7737,6 @@ function applySmartPaste(prefix) {
         + (kept.length ? ` · ${kept.length} LOCKED KEPT` : '')
         + ' — CHECK THEM', 'ok');
   if (parsed.pincode && isReg) onPincodeInput('reg');
-  if (prefix.startsWith('bk')) {
-    const i = parseInt(prefix.slice(2), 10);
-    if (!isNaN(i)) bkUpdateCard(i);
-  }
   markDirty();
 }
 
@@ -8638,53 +7762,7 @@ function openLensFromPaste(prefix) {
     document.getElementById('doc-zone')?.scrollIntoView({ behavior:'smooth', block:'center' });
     return;
   }
-  const i = parseInt(prefix.slice(2), 10);
-  const st = bkSt[i];
-  if (st?.docEd) return openLens('bk', i, 'doc');
-  if (st?.aiEd)  return openLens('bk', i, 'ai');
-  toast('UPLOAD A DOCUMENT OR FORM IMAGE FOR THIS PERSON FIRST','err');
-}
-
-// ════════════════════════════════════════════════════════════════
-// BULK PINCODE CHECK
-// Same India Post lookup the register page uses. Shown inline because the
-// bulk form has no verify bar of its own.
-// ════════════════════════════════════════════════════════════════
-function bkPinCheck(i) {
-  const el = bkEl(i, 'pincode');
-  if (!el) return;
-  const pin = (el.value || '').trim();
-  let tag = document.getElementById(`bk${i}-pin-note`);
-  if (!tag) {
-    tag = document.createElement('div');
-    tag.id = `bk${i}-pin-note`;
-    tag.style.cssText = "font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.5px;margin-top:3px;min-height:12px;";
-    (el.parentNode || el).appendChild(tag);
-  }
-  if (!/^\d{6}$/.test(pin)) { tag.textContent = ''; return; }
-  tag.textContent = '⏳ CHECKING…'; tag.style.color = 'var(--muted)';
-  lookupPincode(pin).then(api => {
-    if ((el.value || '').trim() !== pin) return;       // operator moved on
-    if (!api) { tag.textContent = '⚠ PINCODE NOT FOUND'; tag.style.color = 'var(--red)'; return; }
-    _pinOffices = api.offices || [];
-    refilterGeoLists(api.state);
-    const dEl = bkEl(i,'district'), sEl = bkEl(i,'state'), cEl = bkEl(i,'city');
-    const put = [];
-    if (dEl && !dEl.value.trim()) { setFieldValue(dEl, api.district); flash(dEl); put.push('DISTRICT'); }
-    if (sEl && !sEl.value.trim()) { setFieldValue(sEl, api.state);    flash(sEl); put.push('STATE'); }
-    if (cEl && !cEl.value.trim() && api.offices?.length === 1) {
-      setFieldValue(cEl, api.offices[0]); flash(cEl); put.push('CITY');
-    }
-    const bad = [];
-    if (dEl?.value.trim() && dEl.value.trim().toLowerCase() !== api.district.toLowerCase())
-      bad.push('DISTRICT SHOULD BE ' + api.district.toUpperCase());
-    if (sEl?.value.trim() && sEl.value.trim().toLowerCase() !== api.state.toLowerCase())
-      bad.push('STATE SHOULD BE ' + api.state.toUpperCase());
-    if (bad.length)      { tag.textContent = '⚠ ' + bad.join(' · ');        tag.style.color = 'var(--orange)'; }
-    else if (put.length) { tag.textContent = '✓ FILLED ' + put.join(' + '); tag.style.color = 'var(--green)'; }
-    else                 { tag.textContent = `✓ ${api.district.toUpperCase()}, ${api.state.toUpperCase()}`; tag.style.color = 'var(--green)'; }
-    bkUpdateCard(i);
-  }).catch(() => { tag.textContent = '⚠ COULD NOT CHECK — OFFLINE?'; tag.style.color = 'var(--orange)'; });
+  toast('UPLOAD A DOCUMENT OR FORM IMAGE FIRST','err');
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -8799,7 +7877,8 @@ function cmdkActions(){
   return [
     { ic:'📋', tx:'Records',                       sub:'TAB',    run:() => switchTab('list') },
     { ic:'✚',  tx:'Register new sevak',            sub:'TAB',    run:() => switchTab('register') },
-    { ic:'⚡', tx:'Bulk register',                 sub:'TAB',    run:() => switchTab('bulk') },
+    { ic:'⌨', tx:'Fast entry — type a team in',    sub:'TAB',    run:() => switchTab('fast') },
+    { ic:'👤', tx:'Staff and bookings',            sub:'TAB',    run:() => switchTab('staff') },
     { ic:'🏅', tx:'Teams',                         sub:'TAB',    run:() => switchTab('teams') },
     { ic:'📊', tx:'Stats',                         sub:'TAB',    run:() => switchTab('stats') },
     { ic:'🔍', tx:'Data checker',                  sub:'TAB',    run:() => switchTab('checker') },
@@ -8941,8 +8020,6 @@ loadDensity();
   const key = document.getElementById('cfg-key')?.value.trim();
   if (url && key) connect();
 })();
-measureChrome();
-bkRenderSidebar();
 populateStateSelects();   // the dropdown must work before anyone connects
 loadGeo();
 switchTab('list');
@@ -10154,8 +9231,13 @@ loadStaff();
 // Values live in the inputs rather than in a parallel array. One copy means
 // the grid and the save can never disagree about what was typed.
 
-const FAST_COLS = ['code','idNumber','sevakName','surName','fatherOrSpouseName','dob','gender','mobileNo'];
-const FAST_REQ  = ['idNumber','sevakName','dob','gender','mobileNo'];   // code and state come from the header
+const FAST_COLS = ['code','idNumber','sevakName','surName','fatherOrSpouseName','dob','gender','mobileNo',
+                   'doorNo','street','city','district','pincode','state'];
+const FAST_REQ  = ['idNumber','sevakName','dob','gender','mobileNo','state'];   // code comes from the numbering
+// What a new row inherits from the bar above it. These are a starting point,
+// not a rule: an address that is the same for everyone is rare, and forcing
+// the header onto every row at save time was quietly wrong.
+const FAST_DEFAULTS = ['state','district','city','street','pincode'];
 let fastSeq = 0;          // row ids, never reused, so a delete cannot alias a row
 let fastDraftT = null;
 
@@ -10165,12 +9247,23 @@ const fastRows = () => [...document.querySelectorAll('#fast-body tr[data-row]')]
   .map(tr => +tr.dataset.row);
 const fastSaved = row => document.querySelector(`#fast-body tr[data-row="${row}"]`)?.dataset.saved === '1';
 
+// The row cells use a datalist rather than a select — a dropdown in every row
+// is slower to type through than a box that completes as you go.
+function fastStateList(){
+  const dl = document.getElementById('dl-fast-state');
+  const sel = document.getElementById('fast-state');
+  if (!dl || !sel) return;
+  dl.innerHTML = [...sel.options].filter(o => o.value)
+    .map(o => `<option value="${escAttr(o.value)}">`).join('');
+}
+
 function fastEnter(){
   if (!document.querySelector('#fast-body tr')) {
     restoreFastDraft().then(restored => { if (!restored) addFastRows(8); });
   }
   const g = document.getElementById('fast-group');
   if (g && !g.value) g.value = mostCommonGroup();
+  fastStateList();
   fastRenumber();
 }
 
@@ -10195,6 +9288,20 @@ function addFastRow(prefill){
     cell('dob', 'placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric"') +
     cell('gender', 'maxlength="6" title="m, f or o" class="fast-in fast-sex"') +
     cell('mobileNo', 'type="tel" maxlength="10" inputmode="numeric"') +
+    cell('doorNo') +
+    cell('street',   'list="dl-street"') +
+    cell('city',     'list="dl-city"') +
+    cell('district', 'list="dl-district"') +
+    cell('pincode',  'maxlength="6" inputmode="numeric"') +
+    cell('state',    'list="dl-fast-state"') +
+    `<td class="fast-photo-cell">
+       <input type="file" id="fast-${row}-photofile" accept="image/*" capture="environment"
+              style="display:none" aria-label="Photo for row ${row}"
+              onchange="fastPhotoPick(${row}, event)" />
+       <button class="fast-photo-btn" id="fast-${row}-photobtn" type="button"
+               onclick="document.getElementById('fast-${row}-photofile').click()"
+               title="Add this person's photo">📷</button>
+     </td>` +
     `<td class="fast-status"></td>` +
     `<td><button class="fast-x" title="Remove this row" onclick="removeFastRow(${row})">✕</button></td>`;
   document.getElementById('fast-body').appendChild(tr);
@@ -10208,8 +9315,65 @@ function addFastRow(prefill){
     el.addEventListener('blur', () => { fastNormalise(row, f); fastValidate(); });
   });
   if (prefill) FAST_COLS.forEach(f => { if (prefill[f]) fastEl(row, f).value = prefill[f]; });
+  else FAST_DEFAULTS.forEach(f => {
+    const v = (document.getElementById('fast-' + f)?.value || '').trim();
+    if (v) fastEl(row, f).value = v;
+  });
   return row;
 }
+
+// Photos are not a text cell, so they live beside the grid rather than in it,
+// keyed by the same row id the inputs use.
+const fastPhotos = {};
+
+async function fastPhotoPick(row, ev){
+  const f = ev.target.files[0];
+  ev.target.value = '';
+  if (!f) return;
+  const btn = document.getElementById(`fast-${row}-photobtn`);
+  btn.textContent = '⏳';
+  try {
+    // Same 30KB budget the register form uses, so a sheet of forty faces does
+    // not turn into a forty megabyte insert.
+    const { base64, bytes } = await compressBlob(f, 30);
+    fastPhotos[row] = base64;
+    fastPaintPhoto(row);
+    btn.title = `Photo attached (${fmtKB(bytes)}) — click to replace, right-click to remove`;
+    markDirty(); scheduleFastDraft();
+  } catch(e){
+    btn.textContent = '📷';
+    toast('PHOTO FAILED: ' + e.message, 'err');
+  }
+}
+
+function fastPaintPhoto(row){
+  const btn = document.getElementById(`fast-${row}-photobtn`);
+  if (!btn) return;
+  const src = fastPhotos[row];
+  btn.innerHTML = src
+    ? `<img src="${escAttr(src)}" alt="" class="fast-photo-thumb">`
+    : '📷';
+  btn.classList.toggle('has-photo', !!src);
+}
+
+function fastPhotoClear(row){
+  if (!fastPhotos[row]) return;
+  delete fastPhotos[row];
+  fastPaintPhoto(row);
+  const btn = document.getElementById(`fast-${row}-photobtn`);
+  if (btn) btn.title = "Add this person's photo";
+  scheduleFastDraft();
+  toast('PHOTO REMOVED','inf');
+}
+
+// Right-click a thumbnail to drop it, rather than spending a column on an ✕
+// that is used once in fifty rows.
+document.addEventListener('contextmenu', e => {
+  const btn = e.target.closest('.fast-photo-btn.has-photo');
+  if (!btn) return;
+  e.preventDefault();
+  fastPhotoClear(+btn.id.split('-')[1]);
+});
 
 function removeFastRow(row){
   const tr = document.querySelector(`#fast-body tr[data-row="${row}"]`);
@@ -10217,6 +9381,7 @@ function removeFastRow(row){
   const typed = FAST_COLS.some(f => f !== 'code' && fastVal(row, f));
   if (typed && !confirm('Remove this row? What is typed in it is lost.')) return;
   tr.remove();
+  delete fastPhotos[row];
   fastRenumber(); scheduleFastDraft();
 }
 
@@ -10236,6 +9401,9 @@ function fastNormalise(row, f){
   if (f === 'mobileNo') el.value = v.replace(/\D/g,'').slice(-10);
   if (f === 'sevakName' || f === 'surName' || f === 'fatherOrSpouseName')
     el.value = toProperCase(cleanName(v));
+  if (f === 'pincode') el.value = v.replace(/\D/g,'').slice(0,6);
+  if (f === 'state')   el.value = matchState(v) || tidyPlace(v);
+  if (f === 'city' || f === 'district' || f === 'street') el.value = tidyPlace(v);
 }
 
 // ── keyboard ─────────────────────────────────────────────────────
@@ -10253,6 +9421,18 @@ function fastKeys(e){
     return;
   }
   if (e.key === 'ArrowUp' && at > 0){ e.preventDefault(); go(rows[at - 1], f); return; }
+  // Ctrl+D copies the cell above. Two people on the same street is common;
+  // prefilling it silently on every new row is how a wrong address gets saved.
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')){
+    e.preventDefault();
+    if (at < 1) return;
+    const above = fastVal(rows[at - 1], f);
+    if (!above) return;
+    e.target.value = above;
+    fastNormalise(row, f); fastValidate(); scheduleFastDraft();
+    flash(e.target);
+    return;
+  }
   // A row that is only a code is an empty row — let backspace out of it remove it.
   if (e.key === 'Backspace' && !e.target.value && f === 'idNumber' && at > 0){
     const only = FAST_COLS.every(x => x === 'code' || !fastVal(row, x));
@@ -10261,6 +9441,7 @@ function fastKeys(e){
 }
 function removeFastRowQuiet(row){
   document.querySelector(`#fast-body tr[data-row="${row}"]`)?.remove();
+  delete fastPhotos[row];
   fastRenumber(); scheduleFastDraft();
 }
 
@@ -10339,7 +9520,7 @@ function fastValidate(){
 
   rows.forEach(r => {
     const saved = fastSaved(r);
-    const any = FAST_COLS.some(f => f !== 'code' && fastVal(r, f));
+    const any = FAST_COLS.some(f => f !== 'code' && fastVal(r, f)) || !!fastPhotos[r];
     if (any && !saved) filled++;
 
     FAST_COLS.forEach(f => {
@@ -10373,9 +9554,8 @@ function fastValidate(){
       seenMob[mob] = seenMob[mob] || (rows.indexOf(r) + 1);
     }
 
-    const stateOk = !!(document.getElementById('fast-state')?.value || '').trim();
     const codeOk  = !!fastVal(r,'code');
-    if (stateOk && codeOk && FAST_REQ.every(f => fastVal(r, f))
+    if (codeOk && FAST_REQ.every(f => fastVal(r, f))
         && !FAST_COLS.some(f => fastEl(r,f)?.classList.contains('fast-bad'))) ready++;
   });
 
@@ -10392,20 +9572,10 @@ function fastValidate(){
 // ── save ─────────────────────────────────────────────────────────
 async function fastSaveAll(){
   if (!SB_URL){ toast('CONNECT TO SUPABASE FIRST','err'); return; }
-  const state = (document.getElementById('fast-state').value || '').trim();
-  if (!state){ toast('PICK THE STATE FOR THIS TEAM','err'); document.getElementById('fast-state').focus(); return; }
-
-  const shared = {
-    state,
-    district: (document.getElementById('fast-district').value||'').trim(),
-    city:     (document.getElementById('fast-city').value||'').trim(),
-    street:   (document.getElementById('fast-street').value||'').trim(),
-    pincode:  (document.getElementById('fast-pincode').value||'').trim()
-  };
 
   const todo = fastRows().filter(r => {
     if (fastSaved(r)) return false;
-    if (!FAST_COLS.some(f => f !== 'code' && fastVal(r, f))) return false;
+    if (!FAST_COLS.some(f => f !== 'code' && fastVal(r, f)) && !fastPhotos[r]) return false;
     return FAST_REQ.every(f => fastVal(r, f)) && fastVal(r,'code')
         && !FAST_COLS.some(f => fastEl(r,f)?.classList.contains('fast-bad'));
   });
@@ -10427,8 +9597,9 @@ async function fastSaveAll(){
   for (let n = 0; n < todo.length; n++){
     const r = todo[n];
     btn.textContent = `⏳ ${n+1} / ${todo.length}`;
-    const raw = { ...shared };
+    const raw = {};
     FAST_COLS.forEach(f => { const v = fastVal(r, f); if (v) raw[f] = v; });
+    if (fastPhotos[r]) raw.photoBase64 = fastPhotos[r];
     raw.dob = normDob(raw.dob);
     raw.gender = normGender(raw.gender);
     const label = `${raw.code} ${raw.sevakName||''} ${raw.surName||''}`.trim();
@@ -10478,8 +9649,12 @@ function scheduleFastDraft(){
 }
 async function saveFastDraft(){
   const rows = fastRows().filter(r => !fastSaved(r))
-    .map(r => Object.fromEntries(FAST_COLS.map(f => [f, fastVal(r, f)])))
-    .filter(o => FAST_COLS.some(f => f !== 'code' && o[f]));
+    .map(r => {
+      const o = Object.fromEntries(FAST_COLS.map(f => [f, fastVal(r, f)]));
+      if (fastPhotos[r]) o._photo = fastPhotos[r];
+      return o;
+    })
+    .filter(o => FAST_COLS.some(f => f !== 'code' && o[f]) || o._photo);
   const head = ['group','start','state','district','city','street','pincode']
     .reduce((o,k) => (o[k] = document.getElementById('fast-'+k)?.value || '', o), {});
   if (!rows.length){ await idbSet('fastDraft', null); return; }
@@ -10496,7 +9671,11 @@ async function restoreFastDraft(){
   Object.entries(d.head || {}).forEach(([k,v]) => {
     const el = document.getElementById('fast-'+k); if (el && v) el.value = v;
   });
-  d.rows.forEach(o => { const r = addFastRow(o); if (o.code) fastEl(r,'code').dataset.manual = '1'; });
+  d.rows.forEach(o => {
+    const r = addFastRow(o);
+    if (o.code) fastEl(r,'code').dataset.manual = '1';
+    if (o._photo){ fastPhotos[r] = o._photo; fastPaintPhoto(r); }
+  });
   addFastRows(3);
   toast(`RESTORED ${d.rows.length} ROWS`,'ok');
   return true;
@@ -10507,6 +9686,7 @@ async function fastClear(){
   if (typed.length && !confirm(`Clear the grid? ${typed.length} unsaved row(s) are lost.`)) return;
   document.getElementById('fast-body').innerHTML = '';
   document.getElementById('fast-log').innerHTML = '';
+  Object.keys(fastPhotos).forEach(k => delete fastPhotos[k]);
   await idbSet('fastDraft', null);
   addFastRows(8);
   clearDirty();
