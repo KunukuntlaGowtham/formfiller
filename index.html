@@ -7283,6 +7283,7 @@ function startTeamRename(el) {
     const v = inp.value.trim();
     if (!v || v === code) delete teamNames[code]; else teamNames[code] = v;
     await idbSet('teamNames', teamNames);
+    if (typeof staffCloudSave === 'function') staffCloudSave();
     renderTeams();
     toast(v && v !== code ? 'TEAM RENAMED' : 'TEAM NAME RESET TO CODE', 'ok');
   };
@@ -7354,6 +7355,7 @@ function closeLeaderPicker() { closeOverlay('leader-overlay'); }
 async function setTeamLeader(code, id) {
   teamLeaders[code] = String(id);
   await idbSet('teamLeaders', teamLeaders);
+  if (typeof staffCloudSave === 'function') staffCloudSave();
   closeLeaderPicker();
   renderTeams();
   toast('TEAM LEADER UPDATED','ok');
@@ -7362,6 +7364,7 @@ async function resetTeamLeader() {
   if (_leaderCode == null) return;
   delete teamLeaders[_leaderCode];
   await idbSet('teamLeaders', teamLeaders);
+  if (typeof staffCloudSave === 'function') staffCloudSave();
   closeLeaderPicker();
   renderTeams();
   toast('LEADER RESET TO FIRST BY ID','inf');
@@ -7420,6 +7423,7 @@ async function saveWaLink(){
   }
   if (v) teamWhatsapp[waCode] = v; else delete teamWhatsapp[waCode];
   await idbSet('teamWhatsapp', teamWhatsapp);
+  if (typeof staffCloudSave === 'function') staffCloudSave();
   renderWaList();
   toast(v ? 'GROUP LINK SAVED' : 'GROUP LINK CLEARED', 'ok');
 }
@@ -9304,7 +9308,12 @@ async function staffCloudSave(){
       method: 'POST',
       headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({ key: CLOUD_KEY, value: {
-        staffList, staffAssignments, savedAt: new Date().toISOString()
+        staffList, staffAssignments,
+        // Team names and pinned leaders print on every report — keeping them
+        // on one device meant the same year-end sheet could name a different
+        // leader depending on the phone it was run from.
+        teamNames, teamLeaders, teamWhatsapp,
+        savedAt: new Date().toISOString()
       }})
     });
   } catch(e){ toast('CLOUD SAVE FAILED: '+e.message, 'err'); }
@@ -9384,8 +9393,12 @@ async function staffAfterConnect(){
       staffAssignments = cloud.staffAssignments || [];
       await idbSet('staffList', staffList);
       await idbSet('staffAssignments', staffAssignments);
+      if (cloud.teamNames)    { teamNames    = cloud.teamNames;    await idbSet('teamNames', teamNames); }
+      if (cloud.teamLeaders)  { teamLeaders  = cloud.teamLeaders;  await idbSet('teamLeaders', teamLeaders); }
+      if (cloud.teamWhatsapp) { teamWhatsapp = cloud.teamWhatsapp; await idbSet('teamWhatsapp', teamWhatsapp); }
       await idbSet('staffSavedAt', cloud.savedAt || new Date().toISOString());
       updateStaffBadge();
+      if (document.getElementById('pg-teams')?.classList.contains('active')) renderTeams();
     }
   } else if (staffCloud && staffList.length){
     staffCloudSave();                       // table exists but is empty — seed it
