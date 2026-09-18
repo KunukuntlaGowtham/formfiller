@@ -1314,6 +1314,40 @@ thead th { position: sticky; top: 0; z-index: 5; }
 body.dense td { padding-top: 6px !important; padding-bottom: 6px !important; }
 body.dense .av { width: 30px !important; height: 30px !important; }
 
+/* ── MULTI-PAGE RAIL ──────────────────────────────────────────── */
+.page-rail {
+  display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap;
+  padding: 8px; margin-top: 8px;
+  background: var(--surface-2); border: var(--b2);
+}
+.pg-thumb {
+  position: relative; width: 58px; height: 58px; flex: 0 0 auto;
+  border: var(--b2); background: var(--surface); cursor: pointer;
+  overflow: hidden; transition: transform .12s;
+}
+.pg-thumb:hover { transform: translateY(-2px); }
+.pg-thumb.on { border-color: var(--blue); box-shadow: var(--shs); }
+.pg-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pg-no {
+  position: absolute; left: 0; bottom: 0;
+  font-family: 'Space Mono', monospace; font-size: 9px; font-weight: 700;
+  background: var(--chrome); color: #fff; padding: 1px 5px;
+}
+.pg-x {
+  position: absolute; top: 0; right: 0; width: 17px; height: 17px;
+  border: none; background: var(--red); color: #fff; cursor: pointer;
+  font-size: 10px; line-height: 17px; padding: 0; text-align: center;
+}
+.pg-count {
+  font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 700;
+  letter-spacing: 1px; color: var(--muted); align-self: center;
+  padding-left: 4px; line-height: 1.5;
+}
+.pg-count span { font-weight: 400; font-size: 9px; opacity: .8; }
+@media (max-width: 600px) { .pg-thumb { width: 48px; height: 48px; } }
+/* The language picker shares a row with small buttons — match their height. */
+.editor-footer .nb-select.nb-sm { padding: 6px 10px; font-size: 12px; }
+
 /* ── RECORDS AS CARDS ON A PHONE ──────────────────────────────── */
 @media (max-width: 760px) {
   .table-scroll thead { display: none; }
@@ -1561,17 +1595,17 @@ body.dense .av { width: 30px !important; height: 30px !important; }
     <div class="reg-sect-head">
       <span class="ico" aria-hidden="true">🤖</span>
       <div>
-        <h3>AI HANDWRITING RECOGNITION</h3>
-        <p>Upload handwritten form → Edit → Gemini scans → Fields auto-filled</p>
+        <h3>HANDWRITING &amp; TEXT RECOGNITION</h3>
+        <p>Upload the form pages → Edit → Scan (local or Gemini) → Fields auto-filled</p>
       </div>
     </div>
     <div class="reg-sect-body">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
         <div>
           <div class="upload-zone" id="ai-zone">
-            <input type="file" id="ai-file" accept="image/*" aria-label="Upload handwritten form" />
+            <input type="file" id="ai-file" accept="image/*" multiple aria-label="Upload handwritten form pages" />
             <div class="uz-ico" aria-hidden="true">📄</div>
-            <p><strong>Click or drag &amp; drop</strong> handwritten form image</p>
+            <p><strong>Click or drag &amp; drop</strong> form pages — several at once is fine</p>
           </div>
           <div class="img-editor" id="ai-editor">
             <div class="editor-toolbar">
@@ -1583,7 +1617,20 @@ body.dense .av { width: 30px !important; height: 30px !important; }
               <button class="nb nb-ghost nb-sm" onclick="aiEd.reset()">↺ RESET</button>
             </div>
             <div class="canvas-wrap" id="ai-canvas-wrap"><canvas id="ai-canvas" class="ec"></canvas></div>
+            <div class="page-rail" id="ai-pages" style="display:none"></div>
             <div class="editor-footer">
+              <button class="nb nb-green nb-sm" id="btn-ocr-local" onclick="runLocalScan('ai')"
+                      title="Runs on this device — no API key, no page limit, works offline">🧠 LOCAL SCAN (FREE)</button>
+              <select class="nb-select nb-sm" id="ocr-lang" aria-label="Scan language" title="Language for the local scan">
+                <option value="eng">English</option>
+                <option value="eng+hin">English + Hindi</option>
+                <option value="eng+tel">English + Telugu</option>
+                <option value="eng+tam">English + Tamil</option>
+                <option value="eng+kan">English + Kannada</option>
+                <option value="eng+mar">English + Marathi</option>
+                <option value="eng+ben">English + Bengali</option>
+                <option value="eng+guj">English + Gujarati</option>
+              </select>
               <button class="nb nb-blue nb-sm" id="btn-ocr" onclick="runOcr()">🔍 RUN GEMINI SCAN</button>
               <button class="nb nb-ghost nb-sm" onclick="openLens('reg',0,'ai')" title="Pick text out of the image by hand">🔤 SELECT TEXT</button>
               <span class="size-badge" id="ai-size"></span>
@@ -1593,11 +1640,17 @@ body.dense .av { width: 30px !important; height: 30px !important; }
         <div style="display:flex;flex-direction:column;gap:12px;">
           <div class="how-box">
             <strong>HOW IT WORKS:</strong><br/>
-            1️⃣ Upload photo of handwritten form<br/>
-            2️⃣ Crop / rotate for clarity<br/>
-            3️⃣ Click <em>Run Gemini Scan</em><br/>
-            4️⃣ Fields auto-filled (green = AI filled)<br/>
+            1️⃣ Upload one or more pages of the form<br/>
+            2️⃣ Crop / rotate each page for clarity<br/>
+            3️⃣ Scan — every page is read together<br/>
+            4️⃣ Fields auto-filled (green = filled for you)<br/>
             5️⃣ Verify &amp; correct before submitting
+            <hr style="border:none;border-top:2px solid var(--line);margin:8px 0;opacity:.35"/>
+            <strong>WHICH SCAN?</strong><br/>
+            🧠 <em>Local</em> — free, offline, no key. Strong on
+            <strong>printed</strong> cards (Aadhaar, PAN, voter ID).<br/>
+            🔍 <em>Gemini</em> — costs a call, needs a key, and is still the one
+            to use for <strong>handwriting</strong>.
           </div>
           <div id="ocr-status" style="display:none;"></div>
         </div>
@@ -1721,15 +1774,15 @@ body.dense .av { width: 30px !important; height: 30px !important; }
   <div class="reg-section">
     <div class="reg-sect-head">
       <span class="ico" aria-hidden="true">🪪</span>
-      <div><h3>DOCUMENT / ID IMAGE</h3><p>Upload ID proof · Crop &amp; rotate · Saved to its own column</p></div>
+      <div><h3>DOCUMENT / ID IMAGE</h3><p>Upload ID proof — front, back, extra pages · Crop &amp; rotate · Saved as one image</p></div>
     </div>
     <div class="reg-sect-body">
       <div class="media-grid">
         <div>
           <div class="upload-zone" id="doc-zone">
-            <input type="file" id="doc-file" accept="image/*" aria-label="Upload document" />
+            <input type="file" id="doc-file" accept="image/*" multiple aria-label="Upload document images" />
             <div class="uz-ico" aria-hidden="true">🪪</div>
-            <p><strong>Click</strong> to select document image</p>
+            <p><strong>Click</strong> to select document images — front &amp; back, or several pages</p>
           </div>
           <div class="img-editor" id="doc-editor">
             <div class="editor-toolbar">
@@ -1741,8 +1794,11 @@ body.dense .av { width: 30px !important; height: 30px !important; }
               <button class="nb nb-ghost nb-sm" onclick="docEd.reset()">↺ RESET</button>
             </div>
             <div class="canvas-wrap" id="doc-canvas-wrap"><canvas id="doc-canvas" class="ec"></canvas></div>
+            <div class="page-rail" id="doc-pages" style="display:none"></div>
             <div class="editor-footer">
               <span class="size-badge" id="doc-size"></span>
+              <button class="nb nb-green nb-sm" id="btn-ocr-local-doc" onclick="runLocalScan('doc')"
+                      title="Reads every page on this device and fills the form — no API key">🧠 SCAN ALL PAGES (FREE)</button>
               <button class="nb nb-blue nb-sm" onclick="openLens('reg',0,'doc')" title="Pick text out of the document">🔤 SELECT TEXT</button>
               <button class="nb nb-orange nb-sm" id="btn-compress-doc" style="display:none" onclick="compressDoc()">⚡ COMPRESS</button>
               <button class="nb nb-green nb-sm" id="btn-upload-doc" style="display:none" onclick="uploadDoc()">⬆ UPLOAD DOC</button>
@@ -3133,7 +3189,7 @@ function b64Bytes(dataUrl){
   return Math.round((dataUrl.length-i-1)*3/4);
 }
 
-async function compressBlob(input, maxKB=30){
+async function compressBlob(input, maxKB=30, maxDim=900){
   const blob=input instanceof Blob?input:dataUrlToBlob(input);
   return new Promise((res,rej)=>{
     const img=new Image(), objUrl=URL.createObjectURL(blob);
@@ -3143,7 +3199,7 @@ async function compressBlob(input, maxKB=30){
       let quality=0.88, scale=1;
       function go(){
         let w=img.width*scale, h=img.height*scale;
-        const mx=900; if(w>mx||h>mx){const r=Math.min(mx/w,mx/h);w*=r;h*=r;}
+        const mx=maxDim; if(w>mx||h>mx){const r=Math.min(mx/w,mx/h);w*=r;h*=r;}
         cv.width=Math.max(1,Math.round(w)); cv.height=Math.max(1,Math.round(h));
         cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
         const b64=cv.toDataURL('image/jpeg',quality);
@@ -3735,7 +3791,8 @@ function parseGeminiJson(text){
 
 async function geminiVision(gemKey, pngDataUrl, promptText, maxTokens=2048){
   const payload={contents:[{parts:[
-    {inline_data:{mime_type:'image/png',data:pngDataUrl.split(',')[1]}},
+    {inline_data:{mime_type:(pngDataUrl.match(/^data:([^;]+)/)||[,'image/png'])[1],
+                  data:pngDataUrl.split(',')[1]}},
     {text:promptText}
   ]}],generationConfig:{temperature:0.05,maxOutputTokens:maxTokens}};
   const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gemKey}`,
@@ -3777,7 +3834,7 @@ async function runOcr(){
   document.getElementById('btn-ocr').disabled=true;
   const task=aiProgressStart('GEMINI OCR — READING HANDWRITING…','🔍',12000);
   try{
-    const text=await geminiVision(gemKey, aiEd.getDataUrl(), OCR_PROMPT);
+    const text=await geminiVision(gemKey, await aiScanImage(), OCR_PROMPT);
     const filled=applyOcrFields(parseGeminiJson(text),'r-');
     sEl.className='ai-status done';
     sEl.innerHTML=`✅ Gemini filled <strong>${filled}</strong> fields. Verify highlighted fields before submitting.`;
@@ -3877,7 +3934,10 @@ function initDocEditor(dataUrl) {
   if (!docEd) docEd = new ImageEditor({
     canvasId:'doc-canvas', wrapId:'doc-canvas-wrap', cropBtnId:'doc-crop-btn',
     applyBtnId:'doc-apply-btn', sizeBadgeId:'doc-size',
-    onCompressed: (rawUrl) => { finalDoc = rawUrl; setPreview('doc-preview', rawUrl); }
+    onCompressed: (rawUrl) => {
+      finalDoc = rawUrl; setPreview('doc-preview', rawUrl);
+      if (typeof onDocPageEdited === 'function') onDocPageEdited();
+    }
   });
   docEd.load(dataUrl); markDirty();
 }
@@ -3894,7 +3954,12 @@ async function compressDoc() {
   const btn = document.getElementById('btn-compress-doc');
   btn.disabled = true; btn.textContent = '⏳ COMPRESSING…';
   try{
-    const { base64, bytes } = await compressBlob(docEd.getJpeg(), 80);
+    // With several pages loaded it is the stitched column that gets saved, so
+    // that is what has to be compressed — not whichever page is on screen.
+    const multi = pageSets.doc.pages.length > 1;
+    if (multi) await syncDocFinal();
+    const src = multi ? finalDoc : docEd.getJpeg();
+    const { base64, bytes } = await compressBlob(src, docSaveKB(), docSaveDim());
     finalDoc = base64;
     setPreview('doc-preview', base64);
     document.getElementById('doc-size').textContent = fmtKB(bytes) + ' (compressed)';
@@ -4179,7 +4244,7 @@ async function submitForm(){
   raw.gender=normGender(raw.gender);
   try{
     if(finalPhoto) raw.photoBase64=(await compressBlob(finalPhoto,30)).base64;
-    if(finalDoc)   raw.docBase64  =(await compressBlob(finalDoc,80)).base64;
+    if(finalDoc)   raw.docBase64  =(await compressBlob(finalDoc, docSaveKB(), docSaveDim())).base64;
   }catch(_){}
   const data=filterToColumns(raw);
   try{
@@ -4211,6 +4276,7 @@ function resetRegForm(){
   DATA_FIELDS.forEach(f=>{const el=document.getElementById('r-'+f);if(el)el.value='';});
   document.getElementById('r-gender').value='';
   finalPhoto=null;finalDoc=null;aiEd=null;phEd=null;docEd=null;
+  if (typeof clearPageSets === 'function') clearPageSets();
   document.getElementById('ph-preview').innerHTML='<span>No photo selected</span>';
   document.getElementById('doc-preview').innerHTML='<span>No document selected</span>';
   ['ph-editor','doc-editor','ai-editor'].forEach(id=>document.getElementById(id).classList.remove('show'));
@@ -8230,6 +8296,12 @@ function parseFullDetails(raw) {
   m = t.match(/\b(\d{6})\b/);
   if (m) { out.pincode = m[1]; t = t.replace(m[0], ' '); }
 
+  // ── email — unambiguous once it is in the text, and taken before the name
+  // guesser gets to a line with an @ in it. Without this the auto-generated
+  // name+dob address quietly wins over the one printed on the form.
+  m = t.match(/\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})\b/);
+  if (m) { out.email = m[1].toLowerCase(); t = t.replace(m[0], ' '); }
+
   // ── gender — female tested first so "male" inside it can't win
   if (/\b(female|महिला|स्त्री|స్త్రీ|பெண்)\b/i.test(t)) out.gender = 'Female';
   else if (/\b(male|पुरुष|पुरूष|పురుషుడు|ஆண்)\b/i.test(t)) out.gender = 'Male';
@@ -8658,6 +8730,413 @@ bkRenderSidebar();
 populateStateSelects();   // the dropdown must work before anyone connects
 loadGeo();
 switchTab('list');
+
+// ════════════════════════════════════════════
+// MULTI-PAGE IMAGES + LOCAL (FREE) OCR
+// ════════════════════════════════════════════
+// Two things live here.
+//
+// 1. The AI and DOCUMENT zones take several images instead of one. Pages are
+//    edited one at a time through the existing editor, scanned together, and
+//    saved as a single stitched image so the table needs no second column.
+//
+// 2. A scan that costs nothing and needs no key: preprocess the canvas, run
+//    Tesseract on it, then push the text through the same parseFullDetails the
+//    Smart Paste box uses. Printed cards (Aadhaar, PAN, voter ID) come out
+//    well. Handwriting is still Gemini's job — when a local scan comes back
+//    thin, the status line says so and offers the paid path rather than
+//    leaving the operator to guess.
+
+const pageSets = {
+  ai:  { pages: [], idx: 0, railId: 'ai-pages',  load: null },
+  doc: { pages: [], idx: 0, railId: 'doc-pages', load: null }
+};
+// Keep the untouched loaders: the page manager must be able to put an image on
+// the canvas WITHOUT that counting as a new page.
+pageSets.ai.load  = initAiEditor;
+pageSets.doc.load = initDocEditor;
+
+function pageEditor(kind){ return kind === 'doc' ? docEd : aiEd; }
+
+// Whatever is on the canvas now belongs to the page we are looking at —
+// rotations and crops would otherwise vanish the moment the operator
+// switched pages.
+function commitCurrentPage(kind){
+  const set = pageSets[kind], ed = pageEditor(kind);
+  if (!ed || !set.pages.length) return;
+  try { set.pages[set.idx] = ed.getJpeg(0.92); } catch(_){}
+}
+
+function loadPageIntoEditor(kind, i){
+  const set = pageSets[kind];
+  if (i < 0 || i >= set.pages.length) return;
+  set.idx = i;
+  set.load(set.pages[i]);
+  renderPageRail(kind);
+}
+
+function goToPage(kind, i){
+  const set = pageSets[kind];
+  if (i === set.idx) return;
+  commitCurrentPage(kind);
+  loadPageIntoEditor(kind, i);
+  if (kind === 'doc') syncDocFinal();
+}
+
+async function removePage(kind, i){
+  const set = pageSets[kind];
+  commitCurrentPage(kind);
+  set.pages.splice(i, 1);
+  if (!set.pages.length){
+    set.idx = 0;
+    renderPageRail(kind);
+    if (kind === 'doc'){
+      finalDoc = null;
+      // setPreview would render an <img src=""> here — go back to the real
+      // empty state instead.
+      document.getElementById('doc-preview').innerHTML = '<span>No document selected</span>';
+    }
+    toast('ALL PAGES REMOVED','inf');
+    return;
+  }
+  loadPageIntoEditor(kind, Math.min(i, set.pages.length - 1));
+  if (kind === 'doc') await syncDocFinal();
+  toast(`PAGE REMOVED — ${set.pages.length} LEFT`,'inf');
+}
+
+// Files arrive from the picker, a drop, or Ctrl+V. All three append.
+function addPages(kind, files){
+  const list = [...files].filter(f => f && f.type.startsWith('image/'));
+  if (!list.length) return;
+  commitCurrentPage(kind);
+  const set = pageSets[kind];
+  let pending = list.length;
+  const firstNew = set.pages.length;
+  list.forEach((f, n) => {
+    const r = new FileReader();
+    r.onload = async ev => {
+      set.pages[firstNew + n] = ev.target.result;
+      if (--pending === 0){
+        loadPageIntoEditor(kind, firstNew);
+        if (kind === 'doc') await syncDocFinal();
+        markDirty();
+        toast(list.length > 1
+          ? `${list.length} PAGES ADDED — ${set.pages.length} TOTAL`
+          : (set.pages.length > 1 ? `PAGE ${set.pages.length} ADDED` : 'IMAGE LOADED'), 'ok');
+      }
+    };
+    r.readAsDataURL(f);
+  });
+}
+
+function clearPageSets(){
+  ['ai','doc'].forEach(k => {
+    pageSets[k].pages = []; pageSets[k].idx = 0;
+    renderPageRail(k);
+  });
+}
+
+function renderPageRail(kind){
+  const set = pageSets[kind];
+  const rail = document.getElementById(set.railId);
+  if (!rail) return;
+  if (set.pages.length < 2){ rail.style.display = 'none'; rail.innerHTML = ''; return; }
+  rail.style.display = 'flex';
+  rail.innerHTML = set.pages.map((src, i) => `
+    <div class="pg-thumb${i === set.idx ? ' on' : ''}" onclick="goToPage('${kind}',${i})" title="Page ${i+1}">
+      <img src="${src}" alt="Page ${i+1}" />
+      <span class="pg-no">${i+1}</span>
+      <button class="pg-x" title="Remove page ${i+1}"
+              onclick="event.stopPropagation();removePage('${kind}',${i})">✕</button>
+    </div>`).join('') +
+    `<div class="pg-count">${set.pages.length} PAGES<br><span>SCANNED TOGETHER</span></div>`;
+}
+
+// ── stitching ────────────────────────────────────────────────────
+function loadImg(src){
+  return new Promise((res, rej) => {
+    const im = new Image();
+    im.onload = () => res(im);
+    im.onerror = () => rej(new Error('Page could not be read'));
+    im.src = src;
+  });
+}
+
+// One column of pages, one JPEG. Keeps docBase64 a single value, so nothing
+// downstream — detail view, lightbox, Excel export, PDF — needs to change.
+async function stitchPages(pages){
+  if (pages.length === 1) return pages[0];
+  const imgs = await Promise.all(pages.map(loadImg));
+  const W = Math.min(1400, Math.max(...imgs.map(i => i.width)) || 1000);
+  const GAP = 10;
+  const hs = imgs.map(i => Math.round(i.height * (W / i.width)));
+  const cv = document.createElement('canvas');
+  cv.width = W;
+  cv.height = hs.reduce((a,b) => a+b, 0) + GAP * (imgs.length - 1);
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  let y = 0;
+  imgs.forEach((im, i) => { ctx.drawImage(im, 0, y, W, hs[i]); y += hs[i] + GAP; });
+  return cv.toDataURL('image/jpeg', 0.9);
+}
+
+// A stitched column is taller than one page, so the save budget grows with it —
+// squeezing four pages into a single page's worth of pixels saves nothing worth
+// keeping.
+function docPageCount(){ return Math.max(1, pageSets.doc.pages.length); }
+function docSaveKB(){  return Math.min(320,  80 * docPageCount()); }
+function docSaveDim(){ return Math.min(2400, 900 * docPageCount()); }
+
+// A rotate or crop on one page changes the column that actually gets saved.
+// Debounced because the editor fires this on every size update, load included.
+let _docSyncT = null;
+function onDocPageEdited(){
+  if (pageSets.doc.pages.length < 2) return;
+  clearTimeout(_docSyncT);
+  _docSyncT = setTimeout(() => syncDocFinal(), 250);
+}
+
+// What Gemini should look at: the whole set when there is one, so a two-page
+// form does not get read as half a form.
+async function aiScanImage(){
+  commitCurrentPage('ai');
+  const p = pageSets.ai.pages;
+  if (p.length > 1) return await stitchPages(p);
+  return p[0] || aiEd.getDataUrl();
+}
+
+async function syncDocFinal(){
+  const set = pageSets.doc;
+  if (!set.pages.length) return;
+  commitCurrentPage('doc');
+  try {
+    finalDoc = await stitchPages(set.pages);
+    setPreview('doc-preview', finalDoc);
+  } catch(e){ toast('COULD NOT COMBINE PAGES: '+e.message,'err'); }
+}
+
+// ── preprocessing ────────────────────────────────────────────────
+// Tesseract wants something near 300dpi of clean black-on-white. A phone photo
+// is neither, and feeding it raw is most of why "free OCR is useless" is the
+// usual verdict. Upscale, stretch the contrast, then threshold locally.
+function ocrPreprocess(src, mode){
+  const TARGET = 1900, MAXW = 2800;
+  let scale = src.width < TARGET ? TARGET / src.width : 1;
+  if (src.width * scale > MAXW) scale = MAXW / src.width;
+  const w = Math.max(1, Math.round(src.width * scale));
+  const h = Math.max(1, Math.round(src.height * scale));
+
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(src, 0, 0, w, h);
+
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const gray = new Uint8ClampedArray(w * h);
+  for (let i = 0, p = 0; i < d.length; i += 4, p++)
+    gray[p] = (d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114) | 0;
+
+  // Contrast stretch on the 2nd/98th percentile — ignores the few black specks
+  // and blown highlights that would otherwise define the range.
+  const hist = new Uint32Array(256);
+  for (let p = 0; p < gray.length; p++) hist[gray[p]]++;
+  const total = gray.length;
+  let lo = 0, hi = 255, acc = 0;
+  for (let v = 0; v < 256; v++){ acc += hist[v]; if (acc > total * 0.02){ lo = v; break; } }
+  acc = 0;
+  for (let v = 255; v >= 0; v--){ acc += hist[v]; if (acc > total * 0.02){ hi = v; break; } }
+  const span = Math.max(1, hi - lo);
+  for (let p = 0; p < gray.length; p++)
+    gray[p] = Math.max(0, Math.min(255, ((gray[p] - lo) * 255 / span) | 0));
+
+  const out = mode === 'gray' ? gray : adaptiveThreshold(gray, w, h);
+  for (let i = 0, p = 0; i < d.length; i += 4, p++){
+    d[i] = d[i+1] = d[i+2] = out[p];
+    d[i+3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return cv;
+}
+
+// Window-mean threshold over an integral image. A single global cutoff turns
+// the shadow of the operator's own hand into a black block across the form.
+function adaptiveThreshold(gray, w, h){
+  const win = (Math.max(15, Math.round(Math.min(w, h) / 28)) | 1);
+  const r = win >> 1, C = 10;
+  const SW = w + 1;
+  const sum = new Float64Array(SW * (h + 1));
+  for (let y = 0; y < h; y++){
+    let row = 0;
+    for (let x = 0; x < w; x++){
+      row += gray[y * w + x];
+      sum[(y + 1) * SW + (x + 1)] = sum[y * SW + (x + 1)] + row;
+    }
+  }
+  const out = new Uint8ClampedArray(w * h);
+  for (let y = 0; y < h; y++){
+    const y0 = Math.max(0, y - r), y1 = Math.min(h - 1, y + r);
+    for (let x = 0; x < w; x++){
+      const x0 = Math.max(0, x - r), x1 = Math.min(w - 1, x + r);
+      const area = (y1 - y0 + 1) * (x1 - x0 + 1);
+      const s = sum[(y1+1) * SW + (x1+1)] - sum[y0 * SW + (x1+1)]
+              - sum[(y1+1) * SW + x0]     + sum[y0 * SW + x0];
+      // gray*area < sum - C*area  →  pixel is darker than its neighbourhood
+      out[y * w + x] = (gray[y * w + x] * area < s - C * area) ? 0 : 255;
+    }
+  }
+  return out;
+}
+
+// ── the scan ─────────────────────────────────────────────────────
+function ocrLang(){
+  return document.getElementById('ocr-lang')?.value
+      || document.getElementById('lens-lang')?.value
+      || 'eng';
+}
+
+async function ocrOnePage(canvas, lang, onProg){
+  const pass = async mode => {
+    const prepped = ocrPreprocess(canvas, mode);
+    const { data } = await Tesseract.recognize(prepped, lang, {
+      logger: m => {
+        if (m.status === 'recognizing text' && onProg) onProg(Math.round((m.progress||0)*100));
+      }
+    });
+    return { text: String(data.text||'').trim(), conf: Number(data.confidence)||0, mode };
+  };
+  let best = await pass('binary');
+  // Thresholding is wrong for some sources — glossy laminate, a faint pencil
+  // form. Grey keeps more of those, so try it when the first pass is weak.
+  if (best.conf < 70 || best.text.length < 24){
+    const alt = await pass('gray');
+    if (alt.conf > best.conf) best = alt;
+  }
+  return best;
+}
+
+let localScanBusy = false;
+
+async function runLocalScan(kind){
+  if (localScanBusy){ toast('A SCAN IS ALREADY RUNNING','err'); return; }
+  const ed = pageEditor(kind);
+  if (!ed){ toast(kind === 'doc' ? 'UPLOAD A DOCUMENT FIRST' : 'UPLOAD A FORM IMAGE FIRST','err'); return; }
+
+  commitCurrentPage(kind);
+  const set = pageSets[kind];
+  const pages = set.pages.length ? set.pages : [ed.getJpeg(0.92)];
+
+  const sEl = document.getElementById('ocr-status');
+  const btn = document.getElementById(kind === 'doc' ? 'btn-ocr-local-doc' : 'btn-ocr-local');
+  const show = (cls, html) => {
+    if (!sEl) return;
+    sEl.style.display = 'flex'; sEl.className = 'ai-status ' + cls; sEl.innerHTML = html;
+  };
+
+  localScanBusy = true;
+  if (btn){ btn.disabled = true; btn.textContent = '⏳ SCANNING…'; }
+  show('proc', '<div class="spinner"></div><span>Reading on this device…</span>');
+  // The status panel lives up in the scan section — a scan started from the
+  // document section further down would otherwise report into empty screen.
+  if (kind === 'doc') sEl?.scrollIntoView({ behavior:'smooth', block:'center' });
+  const task = aiProgressStart(`LOCAL OCR — READING ${pages.length} PAGE${pages.length>1?'S':''}…`,'🧠', 20000);
+
+  try {
+    await ensureTesseract();
+    const lang = ocrLang();
+    const texts = [];
+    let confSum = 0;
+    for (let i = 0; i < pages.length; i++){
+      const im = await loadImg(pages[i]);
+      const cv = document.createElement('canvas');
+      cv.width = im.width; cv.height = im.height;
+      cv.getContext('2d').drawImage(im, 0, 0);
+      const res = await ocrOnePage(cv, lang, pct => {
+        show('proc', `<div class="spinner"></div><span>Page ${i+1} of ${pages.length} — ${pct}%</span>`);
+      });
+      if (res.text) texts.push(res.text);
+      confSum += res.conf;
+    }
+
+    const text = texts.join('\n');
+    const conf = Math.round(confSum / pages.length);
+    if (!text.trim()){
+      show('fail', '❌ No text found. Crop tighter, straighten the image, or use the Gemini scan for handwriting.');
+      aiProgressEnd(task, 'NO TEXT FOUND','❌');
+      toast('NO TEXT FOUND','err');
+      return;
+    }
+
+    // Everything recognised goes in the paste box too. The parser below only
+    // takes what it is sure of; the rest stays visible and correctable instead
+    // of being thrown away.
+    const box = document.getElementById('r-smart-paste');
+    if (box) box.value = text;
+
+    const filled = applyOcrFields(parseFullDetails(text), 'r-');
+    markDirty(); autoEmail();
+    if (typeof updateReqProgress === 'function') updateReqProgress();
+
+    const wc = text.split(/\s+/).filter(Boolean).length;
+    if (filled >= 3){
+      show('done', `✅ Local scan filled <strong>${filled}</strong> field${filled>1?'s':''} from ${pages.length} page${pages.length>1?'s':''} · ${wc} words · ${conf}% confidence. Verify before submitting.`);
+      toast(`LOCAL OCR FILLED ${filled} FIELDS`,'ok');
+    } else {
+      const hasGem = !!document.getElementById('cfg-gemini')?.value.trim();
+      show('fail',
+        `⚠ Only <strong>${filled}</strong> field${filled===1?'':'s'} matched (${wc} words read, ${conf}% confidence). ` +
+        `The full text is in the Smart Paste box — edit it and press SPLIT. ` +
+        (hasGem ? 'Handwriting reads far better with the Gemini scan.'
+                : 'Handwriting needs the Gemini scan — add a key in the config bar.'));
+      toast(`LOCAL OCR FILLED ${filled} FIELDS — CHECK PASTE BOX`, filled ? 'inf' : 'err');
+    }
+    aiProgressEnd(task, `LOCAL OCR — ${filled} FIELDS`, filled >= 3 ? '✅' : '⚠');
+  } catch(e){
+    show('fail', '❌ ' + escHtml(e.message));
+    toast('LOCAL SCAN FAILED: '+e.message,'err');
+    aiProgressEnd(task,'LOCAL SCAN FAILED','❌');
+  } finally {
+    localScanBusy = false;
+    if (btn){ btn.disabled = false; btn.textContent = kind === 'doc' ? '🧠 SCAN ALL PAGES (FREE)' : '🧠 LOCAL SCAN (FREE)'; }
+  }
+}
+
+// ── wiring ───────────────────────────────────────────────────────
+// The pickers now take several files, and every entry point appends a page
+// rather than replacing the one before it.
+(function wirePages(){
+  const ai  = document.getElementById('ai-file');
+  const doc = document.getElementById('doc-file');
+  if (ai){
+    ai.multiple = true;
+    ai.onchange = e => { addPages('ai', e.target.files); e.target.value = ''; };
+  }
+  if (doc){
+    doc.multiple = true;
+    doc.onchange = e => { addPages('doc', e.target.files); e.target.value = ''; };
+  }
+
+  // Drops and Ctrl+V reach the editors through initAiEditor/initDocEditor.
+  // Wrap those so an image arriving that way becomes a page as well.
+  const wrap = (kind, orig) => function(dataUrl){
+    const set = pageSets[kind];
+    if (set.pages[set.idx] !== dataUrl){
+      commitCurrentPage(kind);
+      set.pages.push(dataUrl);
+      set.idx = set.pages.length - 1;
+    }
+    const r = orig(dataUrl);
+    renderPageRail(kind);
+    if (kind === 'doc' && set.pages.length > 1) syncDocFinal();
+    return r;
+  };
+  initAiEditor  = wrap('ai',  pageSets.ai.load);
+  initDocEditor = wrap('doc', pageSets.doc.load);
+})();
+
 </script>
 </body>
 </html>
