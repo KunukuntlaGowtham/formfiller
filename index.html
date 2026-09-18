@@ -1314,6 +1314,43 @@ thead th { position: sticky; top: 0; z-index: 5; }
 body.dense td { padding-top: 6px !important; padding-bottom: 6px !important; }
 body.dense .av { width: 30px !important; height: 30px !important; }
 
+/* ── FAST ENTRY GRID ──────────────────────────────────────────── */
+.fast-table td { padding: 0 !important; }
+.fast-table th { white-space: nowrap; }
+.fast-in {
+  width: 100%; border: none; background: transparent; padding: 7px 8px;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--ink);
+  outline: none; border-radius: 0;
+}
+.fast-in:focus {
+  background: var(--yellow); color: #0f0f0f;
+  box-shadow: inset 0 0 0 2px var(--line);
+}
+.fast-sex { text-transform: capitalize; }
+/* A cell that cannot be saved, and one that only wants attention. */
+.fast-in.fast-bad  { background: #ffe0e0; box-shadow: inset 0 0 0 2px var(--red); }
+.fast-in.fast-warn { box-shadow: inset 0 0 0 2px var(--orange); }
+:root[data-theme="dark"] .fast-in.fast-bad { background: #4a1f1f; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .fast-in.fast-bad { background: #4a1f1f; }
+}
+.fast-no {
+  text-align: center; font-family: 'Space Mono', monospace;
+  font-size: 10px; color: var(--muted); padding: 0 4px !important;
+}
+.fast-status { font-family: 'Space Mono', monospace; font-size: 10px; padding: 0 6px !important; }
+.fast-done .fast-in { opacity: .55; }
+.fast-x {
+  border: none; background: transparent; color: var(--muted);
+  cursor: pointer; font-size: 12px; padding: 4px 6px;
+}
+.fast-x:hover { color: var(--red); }
+.fast-log-box {
+  font-family: 'Space Mono', monospace; font-size: 11px; line-height: 1.8;
+  max-height: 180px; overflow-y: auto;
+  background: var(--surface-2); border: var(--b2); padding: 8px 12px;
+}
+
 /* ── MULTI-PAGE RAIL ──────────────────────────────────────────── */
 .page-rail {
   display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap;
@@ -1395,6 +1432,9 @@ body.dense .av { width: 30px !important; height: 30px !important; }
     </button>
     <button class="tab-btn" data-tab="bulk" onclick="switchTab('bulk')">
       ⚡ BULK REGISTER
+    </button>
+    <button class="tab-btn" data-tab="fast" onclick="switchTab('fast')">
+      ⌨ FAST ENTRY
     </button>
     <button class="tab-btn" data-tab="teams" onclick="switchTab('teams')">
       🏅 TEAMS <span class="tab-count" id="tc-teams">0</span>
@@ -1888,6 +1928,84 @@ body.dense .av { width: 30px !important; height: 30px !important; }
 
     <!-- per-person forms injected here -->
     <div id="bk-forms"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════ PAGE: FAST ENTRY ═══════════════════ -->
+<div class="page" id="pg-fast">
+  <div class="chk-header">
+    <div>
+      <h2>FAST ENTRY</h2>
+      <p>One row per person, straight off the paper. Tab moves across, Enter drops to the next row,
+         codes number themselves, and the address is typed once for the whole team.</p>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <span id="fast-count" style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;letter-spacing:1px;"></span>
+      <button class="nb nb-ghost" onclick="addFastRows(5)" title="Add five more rows">＋ 5 ROWS</button>
+      <button class="nb nb-ghost" onclick="fastRenumber()" title="Re-number every code from the team and start number">🔢 RENUMBER</button>
+      <button class="nb nb-red"   onclick="fastClear()" title="Empty the grid">✕ CLEAR</button>
+      <button class="nb nb-yellow" id="fast-save-btn" onclick="fastSaveAll()">⚡ SAVE ALL</button>
+    </div>
+  </div>
+
+  <div style="padding:0 24px 24px;">
+    <!-- Everyone on a team shares these, so they are typed once up here
+         rather than on every row. -->
+    <div class="d-section" style="margin-bottom:14px;">
+      <div class="d-head">👥 THIS TEAM — TYPED ONCE, APPLIED TO EVERY ROW</div>
+      <div style="padding:12px 14px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+        <div class="fld" style="flex:0 1 120px;">
+          <label for="fast-group">Team / code <span class="req">*</span></label>
+          <input id="fast-group" placeholder="DD" oninput="fastRenumber()" />
+        </div>
+        <div class="fld" style="flex:0 1 100px;">
+          <label for="fast-start">Start at</label>
+          <input id="fast-start" inputmode="numeric" placeholder="auto" oninput="fastRenumber()" />
+        </div>
+        <div class="fld" style="flex:0 1 170px;">
+          <label for="fast-state">State <span class="req">*</span></label>
+          <select id="fast-state"><option value="">Select State</option></select>
+        </div>
+        <div class="fld" style="flex:0 1 150px;">
+          <label for="fast-district">District</label>
+          <input id="fast-district" list="dl-district" />
+        </div>
+        <div class="fld" style="flex:0 1 150px;">
+          <label for="fast-city">City</label>
+          <input id="fast-city" list="dl-city" />
+        </div>
+        <div class="fld" style="flex:1 1 170px;">
+          <label for="fast-street">Street</label>
+          <input id="fast-street" list="dl-street" />
+        </div>
+        <div class="fld" style="flex:0 1 110px;">
+          <label for="fast-pincode">Pincode</label>
+          <input id="fast-pincode" maxlength="6" inputmode="numeric" />
+        </div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-scroll">
+        <table class="fast-table">
+          <thead><tr>
+            <th style="width:34px;">#</th>
+            <th style="width:92px;">CODE</th>
+            <th style="width:140px;">ID / AADHAAR <span class="req">*</span></th>
+            <th style="width:150px;">NAME <span class="req">*</span></th>
+            <th style="width:120px;">SURNAME</th>
+            <th style="width:150px;">FATHER / SPOUSE</th>
+            <th style="width:110px;">DOB <span class="req">*</span></th>
+            <th style="width:56px;" title="Type m, f or o">SEX <span class="req">*</span></th>
+            <th style="width:120px;">MOBILE <span class="req">*</span></th>
+            <th style="width:100px;">STATUS</th>
+            <th style="width:34px;"></th>
+          </tr></thead>
+          <tbody id="fast-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="fast-log" style="margin-top:12px;"></div>
   </div>
 </div>
 
@@ -2639,12 +2757,13 @@ function switchTab(tab) {
   const showSearch = tab==='list';
   document.getElementById('search-bar').style.display = showSearch?'':'none';
   document.getElementById('ai-drawer').classList.remove('open');
-  const pg = {list:'pg-list',detail:'pg-detail',register:'pg-register',bulk:'pg-bulk',checker:'pg-checker',stats:'pg-stats',teams:'pg-teams',staff:'pg-staff'}[tab];
+  const pg = {list:'pg-list',detail:'pg-detail',register:'pg-register',bulk:'pg-bulk',checker:'pg-checker',stats:'pg-stats',teams:'pg-teams',staff:'pg-staff',fast:'pg-fast'}[tab];
   if(pg) document.getElementById(pg).classList.add('active');
   if(tab==='bulk') { measureChrome(); checkForDraft(); }
   if(tab==='stats') renderStats();
   if(tab==='teams') renderTeams();
   if(tab==='staff') renderStaff();
+  if(tab==='fast') fastEnter();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -7688,7 +7807,7 @@ function populateStateSelects(){
     + (extra.length
         ? `<optgroup label="ALREADY IN YOUR DATA">${extra.map(s => `<option value="${escAttr(s)}">${escHtml(s)}</option>`).join('')}</optgroup>`
         : '');
-  document.querySelectorAll('#r-state, #f-state, select[id^="bk"][id$="-state"]').forEach(sel => {
+  document.querySelectorAll('#r-state, #f-state, #fast-state, select[id^="bk"][id$="-state"]').forEach(sel => {
     const keep = sel.value;
     sel.innerHTML = html;
     if (keep) setFieldValue(sel, keep);
@@ -10021,6 +10140,378 @@ async function importStaffBackup(ev){
 }
 
 loadStaff();
+
+
+// ════════════════════════════════════════════
+// FAST ENTRY
+// ════════════════════════════════════════════
+// Typing a team in off paper is a different job from registering one person.
+// The per-person form is the wrong shape for it: you see one card at a time,
+// re-type the same address on every one, and scroll to check what you just
+// entered. Here the whole team is one grid — tab across, Enter down, codes
+// numbering themselves, address typed once at the top.
+//
+// Values live in the inputs rather than in a parallel array. One copy means
+// the grid and the save can never disagree about what was typed.
+
+const FAST_COLS = ['code','idNumber','sevakName','surName','fatherOrSpouseName','dob','gender','mobileNo'];
+const FAST_REQ  = ['idNumber','sevakName','dob','gender','mobileNo'];   // code and state come from the header
+let fastSeq = 0;          // row ids, never reused, so a delete cannot alias a row
+let fastDraftT = null;
+
+const fastEl  = (row, f) => document.getElementById(`fast-${row}-${f}`);
+const fastVal = (row, f) => (fastEl(row, f)?.value || '').trim();
+const fastRows = () => [...document.querySelectorAll('#fast-body tr[data-row]')]
+  .map(tr => +tr.dataset.row);
+const fastSaved = row => document.querySelector(`#fast-body tr[data-row="${row}"]`)?.dataset.saved === '1';
+
+function fastEnter(){
+  if (!document.querySelector('#fast-body tr')) {
+    restoreFastDraft().then(restored => { if (!restored) addFastRows(8); });
+  }
+  const g = document.getElementById('fast-group');
+  if (g && !g.value) g.value = mostCommonGroup();
+  fastRenumber();
+}
+
+// ── rows ─────────────────────────────────────────────────────────
+function addFastRows(n){
+  for (let i = 0; i < n; i++) addFastRow();
+  fastRenumber();
+}
+
+function addFastRow(prefill){
+  const row = ++fastSeq;
+  const tr = document.createElement('tr');
+  tr.dataset.row = row;
+  const cell = (f, extra) => `<td><input id="fast-${row}-${f}" data-row="${row}" data-f="${f}" class="fast-in" ${extra||''} /></td>`;
+  tr.innerHTML =
+    `<td class="fast-no"></td>` +
+    cell('code') +
+    cell('idNumber', 'inputmode="numeric" maxlength="14"') +
+    cell('sevakName') +
+    cell('surName') +
+    cell('fatherOrSpouseName') +
+    cell('dob', 'placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric"') +
+    cell('gender', 'maxlength="6" title="m, f or o" class="fast-in fast-sex"') +
+    cell('mobileNo', 'type="tel" maxlength="10" inputmode="numeric"') +
+    `<td class="fast-status"></td>` +
+    `<td><button class="fast-x" title="Remove this row" onclick="removeFastRow(${row})">✕</button></td>`;
+  document.getElementById('fast-body').appendChild(tr);
+
+  attachDobMask(fastEl(row, 'dob'));
+  FAST_COLS.forEach(f => {
+    const el = fastEl(row, f);
+    el.addEventListener('keydown', fastKeys);
+    el.addEventListener('paste', fastPaste);
+    el.addEventListener('input', () => { markDirty(); scheduleFastDraft(); });
+    el.addEventListener('blur', () => { fastNormalise(row, f); fastValidate(); });
+  });
+  if (prefill) FAST_COLS.forEach(f => { if (prefill[f]) fastEl(row, f).value = prefill[f]; });
+  return row;
+}
+
+function removeFastRow(row){
+  const tr = document.querySelector(`#fast-body tr[data-row="${row}"]`);
+  if (!tr) return;
+  const typed = FAST_COLS.some(f => f !== 'code' && fastVal(row, f));
+  if (typed && !confirm('Remove this row? What is typed in it is lost.')) return;
+  tr.remove();
+  fastRenumber(); scheduleFastDraft();
+}
+
+// One keystroke for a sex, and a date that reads as a date whichever way it
+// was typed. Both get corrected on the way out of the cell, not while typing.
+function fastNormalise(row, f){
+  const el = fastEl(row, f);
+  if (!el) return;
+  const v = el.value.trim();
+  if (!v) return;
+  if (f === 'gender'){
+    const k = v[0].toLowerCase();
+    el.value = k === 'm' ? 'Male' : k === 'f' ? 'Female' : k === 'o' ? 'Other' : normGender(v) || v;
+  }
+  if (f === 'dob')      el.value = normDob(v) || v;
+  if (f === 'idNumber') el.value = v.replace(/\s+/g,'');
+  if (f === 'mobileNo') el.value = v.replace(/\D/g,'').slice(-10);
+  if (f === 'sevakName' || f === 'surName' || f === 'fatherOrSpouseName')
+    el.value = toProperCase(cleanName(v));
+}
+
+// ── keyboard ─────────────────────────────────────────────────────
+// Tab across is the browser's. Enter and the arrows move down the column,
+// which is how a column of dates or mobiles gets typed off a page.
+function fastKeys(e){
+  const row = +e.target.dataset.row, f = e.target.dataset.f;
+  const rows = fastRows(), at = rows.indexOf(row);
+  const go = (r, field) => { const el = fastEl(r, field); if (el){ el.focus(); el.select?.(); } };
+
+  if (e.key === 'Enter' || (e.key === 'ArrowDown' && !e.shiftKey)){
+    e.preventDefault();
+    if (at === rows.length - 1){ const r = addFastRow(); fastRenumber(); go(r, f); }
+    else go(rows[at + 1], f);
+    return;
+  }
+  if (e.key === 'ArrowUp' && at > 0){ e.preventDefault(); go(rows[at - 1], f); return; }
+  // A row that is only a code is an empty row — let backspace out of it remove it.
+  if (e.key === 'Backspace' && !e.target.value && f === 'idNumber' && at > 0){
+    const only = FAST_COLS.every(x => x === 'code' || !fastVal(row, x));
+    if (only){ e.preventDefault(); const prev = rows[at - 1]; removeFastRowQuiet(row); go(prev, 'mobileNo'); }
+  }
+}
+function removeFastRowQuiet(row){
+  document.querySelector(`#fast-body tr[data-row="${row}"]`)?.remove();
+  fastRenumber(); scheduleFastDraft();
+}
+
+// Pasting a block from anywhere fills down and across from the cell you are
+// in, adding rows as needed — the grid should not be the reason a list has to
+// be retyped.
+function fastPaste(e){
+  const text = (e.clipboardData || window.clipboardData).getData('text') || '';
+  if (!/[\t\n]/.test(text)) return;                 // ordinary single-value paste
+  e.preventDefault();
+  const grid = text.replace(/\r/g,'').split('\n').filter(l => l.trim())
+                   .map(l => l.split('\t'));
+  const startRow = +e.target.dataset.row;
+  const startCol = FAST_COLS.indexOf(e.target.dataset.f);
+  let rows = fastRows();
+  let at = rows.indexOf(startRow);
+
+  grid.forEach((line, n) => {
+    if (at + n >= rows.length){ addFastRow(); rows = fastRows(); }
+    const r = rows[at + n];
+    line.forEach((cellText, c) => {
+      const f = FAST_COLS[startCol + c];
+      if (!f) return;
+      const el = fastEl(r, f);
+      if (el){ el.value = cellText.trim(); fastNormalise(r, f); }
+    });
+  });
+  fastRenumber(); fastValidate(); scheduleFastDraft();
+  toast(`PASTED ${grid.length} ROW${grid.length===1?'':'S'}`,'ok');
+}
+
+// ── codes ────────────────────────────────────────────────────────
+// Numbered from the team and start number, skipping rows already saved and
+// leaving a hand-typed code alone.
+function fastRenumber(){
+  const group = (document.getElementById('fast-group')?.value || '').trim();
+  const startRaw = (document.getElementById('fast-start')?.value || '').trim();
+  const rows = fastRows();
+
+  rows.forEach((r, i) => {
+    const tr = document.querySelector(`#fast-body tr[data-row="${r}"]`);
+    tr.querySelector('.fast-no').textContent = i + 1;
+  });
+  if (!group) { fastValidate(); return; }
+
+  let n;
+  if (/^\d+$/.test(startRaw)) n = parseInt(startRaw, 10);
+  else {
+    const next = computeNextCode(group);
+    const p = next ? parseSeq(next) : null;
+    n = p ? p.num : 1;
+  }
+  rows.forEach(r => {
+    if (fastSaved(r)) return;
+    const el = fastEl(r, 'code');
+    if (el && !el.dataset.manual) el.value = group + n;
+    n++;
+  });
+  fastValidate();
+}
+
+// A code typed by hand stops being managed by the numbering.
+document.addEventListener('input', e => {
+  if (e.target.dataset?.f === 'code' && e.isTrusted) e.target.dataset.manual = '1';
+}, true);
+
+// ── validation ───────────────────────────────────────────────────
+// Everything checkable is checked while typing rather than at save, because
+// a sheet of twenty is exactly where a repeated mobile number hides.
+function fastValidate(){
+  const rows = fastRows();
+  const seenId = {}, seenMob = {};
+  const dbIds  = new Set(allRecords.map(r => String(r.idNumber||'').replace(/\s/g,'')).filter(Boolean));
+  const dbMobs = new Set(allRecords.map(r => String(r.mobileNo||'').replace(/\D/g,'')).filter(Boolean));
+  let ready = 0, filled = 0;
+
+  rows.forEach(r => {
+    const saved = fastSaved(r);
+    const any = FAST_COLS.some(f => f !== 'code' && fastVal(r, f));
+    if (any && !saved) filled++;
+
+    FAST_COLS.forEach(f => {
+      const el = fastEl(r, f);
+      if (!el) return;
+      el.classList.remove('fast-bad','fast-warn');
+      el.title = '';
+      if (saved) return;
+      const v = fastVal(r, f);
+      if (any && FAST_REQ.includes(f) && !v){ el.classList.add('fast-warn'); el.title = 'Required'; }
+    });
+
+    if (!any || saved) return;
+
+    const id = fastVal(r,'idNumber').replace(/\s/g,'');
+    if (id){
+      const el = fastEl(r,'idNumber');
+      if (seenId[id]){ el.classList.add('fast-bad'); el.title = `Same ID as row ${seenId[id]}`; }
+      else if (dbIds.has(id)){ el.classList.add('fast-bad'); el.title = 'This ID is already in the registry'; }
+      else if (id.length === 12 && typeof verhoeffOk === 'function' && !verhoeffOk(id)){
+        el.classList.add('fast-warn'); el.title = 'Aadhaar check digit fails — re-read the number';
+      }
+      seenId[id] = seenId[id] || (rows.indexOf(r) + 1);
+    }
+    const mob = fastVal(r,'mobileNo').replace(/\D/g,'');
+    if (mob){
+      const el = fastEl(r,'mobileNo');
+      if (seenMob[mob]){ el.classList.add('fast-bad'); el.title = `Same mobile as row ${seenMob[mob]}`; }
+      else if (dbMobs.has(mob)){ el.classList.add('fast-warn'); el.title = 'This mobile is already in the registry'; }
+      else if (mob.length !== 10){ el.classList.add('fast-warn'); el.title = '10 digits expected'; }
+      seenMob[mob] = seenMob[mob] || (rows.indexOf(r) + 1);
+    }
+
+    const stateOk = !!(document.getElementById('fast-state')?.value || '').trim();
+    const codeOk  = !!fastVal(r,'code');
+    if (stateOk && codeOk && FAST_REQ.every(f => fastVal(r, f))
+        && !FAST_COLS.some(f => fastEl(r,f)?.classList.contains('fast-bad'))) ready++;
+  });
+
+  const c = document.getElementById('fast-count');
+  if (c){
+    c.innerHTML = `${filled} TYPED · <span style="color:var(--green)">${ready} READY</span>` +
+      (filled - ready > 0 ? ` · <span style="color:var(--orange)">${filled - ready} INCOMPLETE</span>` : '');
+  }
+  const btn = document.getElementById('fast-save-btn');
+  if (btn) btn.disabled = !ready;
+  return ready;
+}
+
+// ── save ─────────────────────────────────────────────────────────
+async function fastSaveAll(){
+  if (!SB_URL){ toast('CONNECT TO SUPABASE FIRST','err'); return; }
+  const state = (document.getElementById('fast-state').value || '').trim();
+  if (!state){ toast('PICK THE STATE FOR THIS TEAM','err'); document.getElementById('fast-state').focus(); return; }
+
+  const shared = {
+    state,
+    district: (document.getElementById('fast-district').value||'').trim(),
+    city:     (document.getElementById('fast-city').value||'').trim(),
+    street:   (document.getElementById('fast-street').value||'').trim(),
+    pincode:  (document.getElementById('fast-pincode').value||'').trim()
+  };
+
+  const todo = fastRows().filter(r => {
+    if (fastSaved(r)) return false;
+    if (!FAST_COLS.some(f => f !== 'code' && fastVal(r, f))) return false;
+    return FAST_REQ.every(f => fastVal(r, f)) && fastVal(r,'code')
+        && !FAST_COLS.some(f => fastEl(r,f)?.classList.contains('fast-bad'));
+  });
+  if (!todo.length){ toast('NO COMPLETE ROWS TO SAVE','err'); return; }
+  if (!confirm(`Save ${todo.length} person${todo.length===1?'':'s'} to ${TABLE}?`)) return;
+
+  const btn = document.getElementById('fast-save-btn');
+  btn.disabled = true;
+  const log = document.getElementById('fast-log');
+  log.innerHTML = '<div class="fast-log-box" id="fast-log-box"></div>';
+  const box = document.getElementById('fast-log-box');
+  const say = (colour, msg) => {
+    const d = document.createElement('div'); d.style.color = colour; d.textContent = msg;
+    box.appendChild(d); box.scrollTop = box.scrollHeight;
+  };
+
+  let ok = 0, failed = 0;
+  const fresh = [];
+  for (let n = 0; n < todo.length; n++){
+    const r = todo[n];
+    btn.textContent = `⏳ ${n+1} / ${todo.length}`;
+    const raw = { ...shared };
+    FAST_COLS.forEach(f => { const v = fastVal(r, f); if (v) raw[f] = v; });
+    raw.dob = normDob(raw.dob);
+    raw.gender = normGender(raw.gender);
+    const label = `${raw.code} ${raw.sevakName||''} ${raw.surName||''}`.trim();
+    const tr = document.querySelector(`#fast-body tr[data-row="${r}"]`);
+    try {
+      const res = await upsertByIdNumber(filterToColumns(raw));
+      tr.dataset.saved = '1';
+      tr.classList.add('fast-done');
+      tr.querySelector('.fast-status').innerHTML = res.action === 'updated'
+        ? '<span style="color:var(--blue);font-weight:700;">↻ UPDATED</span>'
+        : '<span style="color:var(--green);font-weight:700;">✓ SAVED</span>';
+      FAST_COLS.forEach(f => { const el = fastEl(r,f); if (el) el.readOnly = true; });
+      if (Array.isArray(res.rows) && res.rows[0]) fresh.push(res.rows[0]);
+      say(res.action === 'updated' ? '#1A56FF' : '#00C16A',
+          `${res.action === 'updated' ? '↻' : '✓'} ${label}`);
+      ok++;
+    } catch(e){
+      tr.querySelector('.fast-status').innerHTML =
+        `<span style="color:var(--red);font-weight:700;" title="${escAttr(e.message)}">✕ FAILED</span>`;
+      say('#E63030', `✕ ${label} — ${e.message}`);
+      failed++;
+    }
+  }
+  warnDropped();
+
+  // Add what came back instead of re-downloading the table, the way a single
+  // registration does — otherwise saving a team of forty pulls every photo.
+  if (fresh.length){
+    allRecords.push(...fresh);
+    fresh.forEach(noteSessionSave);
+    buildCodeFilter(); buildStateFilter(); rebuildDatalists();
+    updateStats(); applyFilters();
+    document.getElementById('tc-records').textContent = allRecords.length;
+  }
+  btn.textContent = '⚡ SAVE ALL';
+  fastValidate();
+  scheduleFastDraft();
+  toast(failed ? `SAVED ${ok}, ${failed} FAILED — SEE THE LOG` : `SAVED ${ok} PEOPLE`, failed ? 'err' : 'ok');
+  if (!failed) clearDirty();
+}
+
+// ── draft ────────────────────────────────────────────────────────
+// An hour of typing should survive a closed tab.
+function scheduleFastDraft(){
+  clearTimeout(fastDraftT);
+  fastDraftT = setTimeout(saveFastDraft, 1200);
+}
+async function saveFastDraft(){
+  const rows = fastRows().filter(r => !fastSaved(r))
+    .map(r => Object.fromEntries(FAST_COLS.map(f => [f, fastVal(r, f)])))
+    .filter(o => FAST_COLS.some(f => f !== 'code' && o[f]));
+  const head = ['group','start','state','district','city','street','pincode']
+    .reduce((o,k) => (o[k] = document.getElementById('fast-'+k)?.value || '', o), {});
+  if (!rows.length){ await idbSet('fastDraft', null); return; }
+  await idbSet('fastDraft', { rows, head, at: Date.now() });
+}
+async function restoreFastDraft(){
+  const d = await idbGet('fastDraft');
+  if (!d || !d.rows?.length) return false;
+  const when = new Date(d.at).toLocaleString('en-IN');
+  if (!confirm(`An unsaved sheet of ${d.rows.length} people is here from ${when}.\n\nOpen it again?`)){
+    await idbSet('fastDraft', null);
+    return false;
+  }
+  Object.entries(d.head || {}).forEach(([k,v]) => {
+    const el = document.getElementById('fast-'+k); if (el && v) el.value = v;
+  });
+  d.rows.forEach(o => { const r = addFastRow(o); if (o.code) fastEl(r,'code').dataset.manual = '1'; });
+  addFastRows(3);
+  toast(`RESTORED ${d.rows.length} ROWS`,'ok');
+  return true;
+}
+
+async function fastClear(){
+  const typed = fastRows().filter(r => !fastSaved(r) && FAST_COLS.some(f => f !== 'code' && fastVal(r, f)));
+  if (typed.length && !confirm(`Clear the grid? ${typed.length} unsaved row(s) are lost.`)) return;
+  document.getElementById('fast-body').innerHTML = '';
+  document.getElementById('fast-log').innerHTML = '';
+  await idbSet('fastDraft', null);
+  addFastRows(8);
+  clearDirty();
+  toast('GRID CLEARED','inf');
+}
 
 </script>
 </body>
