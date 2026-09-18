@@ -1714,6 +1714,64 @@ td { border: none; }
 .modal-title { color: var(--ink); }
 .pg-no { background: var(--lav-600); }
 
+
+/* ── arrangement ───────────────────────────────────────────────── */
+/* The nav was wrapping to three lines once there were seven tabs. One row
+   that scrolls beats three that reflow every time a count changes. */
+/* Seven tabs, a brand and five actions do not fit one laptop row. Scrolling
+   them hid four tabs behind no affordance at all, so they wrap instead — and
+   are trimmed down enough that the wrap is usually two tidy lines. */
+.top-nav { flex-wrap: nowrap; align-items: center; }
+.nav-tabs {
+  flex-wrap: wrap; min-width: 0; flex: 1 1 auto;
+  align-items: center; gap: 4px; padding: 8px 10px;
+}
+.tab-btn {
+  white-space: nowrap; flex: 0 0 auto;
+  padding: 7px 12px; font-size: 12.5px; line-height: 1.15; gap: 6px;
+}
+.tab-count { font-size: 10px; padding: 1px 6px; }
+.nav-right { flex: 0 0 auto; align-items: center; }
+@media (max-width: 1240px) { .tab-btn { padding: 6px 9px; font-size: 12px; } }
+@media (max-width: 860px) {
+  .brand-name { font-size: 18px; }
+  .brand-table { display: none; }
+}
+
+/* Page toolbars: one right-aligned row that wraps as a whole rather than
+   dropping a single orphan button onto its own line. */
+.chk-header > div:last-child { justify-content: flex-end; row-gap: 8px; }
+.tb-group {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 7px; border-radius: 14px;
+  background: rgba(255,255,255,.34);
+  border: 1px solid var(--line);
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+}
+:root[data-theme="dark"] .tb-group { background: rgba(255,255,255,.05); }
+.tb-group .nb { box-shadow: none; }
+.tb-group .nb-select { padding: 6px 8px; font-size: 12px; }
+.tb-quiet { opacity: .85; }
+.tb-quiet:hover { opacity: 1; }
+
+/* Stat tiles filled a third of the row and left the rest empty. */
+.stats-strip {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+}
+.stat { min-width: 0; }
+.stat .v { font-size: clamp(26px, 3vw, 38px); }
+
+/* Headings and their toolbar share a baseline, with the description free to
+   wrap underneath instead of shoving the buttons around. */
+.chk-header { align-items: center; row-gap: 12px; }
+.chk-header > div:first-child { flex: 1 1 320px; min-width: 260px; }
+.chk-header p { max-width: 78ch; }
+
+/* Cards breathe a little more now that they are not fighting a black border. */
+.d-section { margin-bottom: 18px; }
+.table-scroll { border-radius: 0 0 var(--r) var(--r); }
+
 </style>
 </head>
 <body>
@@ -2305,14 +2363,18 @@ td { border: none; }
         <span class="ico" aria-hidden="true">⌕</span>
         <input type="text" id="staff-search" placeholder="Search staff, team, leader…" aria-label="Search staff" oninput="renderStaff()" />
       </div>
-      <button class="nb nb-red"   onclick="printStaffReport()"   title="Staff, their team, the team leader and member counts">📄 STAFF + TEAM PDF</button>
-      <button class="nb nb-blue"  onclick="printMonthlyReport()" title="Month by month, how many joined each team">📅 MONTHLY PDF</button>
       <button class="nb nb-yellow" onclick="openRotation()" title="Give every staff member their team for the new month">🔄 NEW MONTH</button>
-      <select class="nb-select nb-sm" id="staff-year" aria-label="Year for the year-end report" title="Year to report on"></select>
-      <button class="nb nb-green" onclick="printYearReport()" title="Which teams each staff member handled that year, and for how long">🗓 YEAR-END PDF</button>
-      <span id="staff-cloud" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;letter-spacing:1px;"></span>
-      <button class="nb nb-ghost" onclick="exportStaffBackup()"  title="Save staff, team names and leaders to a file">⬇ BACKUP</button>
-      <button class="nb nb-ghost" onclick="document.getElementById('staff-restore-file').click()" title="Load a backup file">⬆ RESTORE</button>
+      <span class="tb-group" title="Reports">
+        <button class="nb nb-red"  onclick="printStaffReport()"   title="Staff, their team, the team leader and member counts">📄 STAFF</button>
+        <button class="nb nb-blue" onclick="printMonthlyReport()" title="Month by month, how many joined each team">📅 MONTHLY</button>
+        <select class="nb-select nb-sm" id="staff-year" aria-label="Year for the year-end report" title="Year to report on"></select>
+        <button class="nb nb-green" onclick="printYearReport()" title="Which teams each staff member handled that year, and for how long">🗓 YEAR-END</button>
+      </span>
+      <span class="tb-group tb-quiet">
+        <button class="nb nb-ghost nb-sm" onclick="exportStaffBackup()" title="Save staff, team names and leaders to a file">⬇</button>
+        <button class="nb nb-ghost nb-sm" onclick="document.getElementById('staff-restore-file').click()" title="Load a backup file">⬆</button>
+        <span id="staff-cloud" style="font-family:'Space Mono',monospace;font-size:10px;font-weight:700;letter-spacing:1px;"></span>
+      </span>
       <input type="file" id="staff-restore-file" accept="application/json" style="display:none" onchange="importStaffBackup(event)" aria-label="Restore staff backup" />
     </div>
   </div>
@@ -9005,7 +9067,31 @@ async function removeStaff(id){
 }
 
 // A hand-over closes the old row and opens a new one, so both are on record.
+// One team per staff member per month. A hand-over inside a month would
+// leave that person credited with two teams for it, which is not how the
+// booking works — so it is refused at the point of assignment rather than
+// discovered in a year-end report.
+function staffMonthConflict(staffId, group, key){
+  if (!staffId) return null;
+  const { from, to } = monthRange(key || thisMonthKey());
+  const clash = staffAssignments.find(a =>
+    String(a.staffId) === String(staffId) &&
+    a.group !== group &&
+    (a.from || '') <= to && (a.to || '9999') >= from);
+  if (!clash) return null;
+  const t = buildTeams().find(x => x.code === clash.group);
+  return { group: clash.group, name: t ? t.name : clash.group, open: !clash.to };
+}
+
 async function assignTeamTo(group, staffId, quiet){
+  const clash = staffMonthConflict(staffId, group);
+  if (clash){
+    const s = staffById(staffId);
+    toast(`${(s?.name||'THIS PERSON').toUpperCase()} ALREADY HAS ${clash.name.toUpperCase()} THIS MONTH`,'err');
+    alert(`${s?.name || 'This person'} is already down for ${clash.name} in ${monthLabel(thisMonthKey())}.\n\nOne team per person per month. Move them next month, or give ${clash.name} to somebody else first.`);
+    renderStaff();
+    return;
+  }
   const now = new Date().toISOString();
   const open = openAssignments().find(a => a.group === group);
   if (open){
@@ -9113,8 +9199,11 @@ function renderStaff(){
           }).join(' ')
         : `<select class="nb-select nb-sm" onchange="assignTeamTo(this.value, '${escAttr(s.id)}')" aria-label="Assign a team to ${escAttr(s.name)}">
              <option value="">— pick a team —</option>
-             ${allTeams.filter(x => !staffOfTeam(x.code)).map(x =>
-               `<option value="${escAttr(x.code)}">${escHtml(x.name)} (${x.members.length})</option>`).join('')}
+             ${allTeams.filter(x => !staffOfTeam(x.code)).map(x => {
+               const c = staffMonthConflict(s.id, x.code);
+               return `<option value="${escAttr(x.code)}"${c?' disabled':''}>${
+                 escHtml(`${x.name} (${x.members.length})` + (c ? ` — ${c.name} already this month` : ''))}</option>`;
+             }).join('')}
            </select>`;
       return `<tr>
         <td><strong>${escHtml(s.name)}</strong></td>
@@ -9174,7 +9263,11 @@ function renderUnassignedTeams(allTeams){
         <span style="color:var(--muted);font-weight:400;">· ${t.members.length}</span></div>
       <select class="nb-select nb-sm" onchange="assignTeamTo('${escAttr(t.code)}', this.value)" aria-label="Assign staff to ${escAttr(t.name)}">
         <option value="">— assign staff —</option>
-        ${staffList.map(s => `<option value="${escAttr(s.id)}">${escHtml(s.name)}</option>`).join('')}
+        ${staffList.map(s => {
+          const c = staffMonthConflict(s.id, t.code);
+          return `<option value="${escAttr(s.id)}"${c?' disabled':''}>${
+            escHtml(s.name + (c ? ` — has ${c.name} this month` : ''))}</option>`;
+        }).join('')}
       </select></div>`).join('') + '</div></div>';
 }
 
@@ -9394,8 +9487,13 @@ function openRotation(){
       <select class="nb-select nb-sm" data-staff="${escAttr(s.id)}" style="flex:0 1 210px;"
               onchange="checkRotationClashes()" aria-label="New team for ${escAttr(s.name)}">
         <option value="">— none this month —</option>
-        ${teams.map(t => `<option value="${escAttr(t.code)}"${t.code===now?' selected':''}>${
-          escHtml(t.name)} (${t.members.length})</option>`).join('')}
+        ${teams.map(t => {
+          let c = t.code === now ? null : staffMonthConflict(s.id, t.code);
+          // The seat they are about to vacate is not a reason to warn.
+          if (c && c.open && c.group === now) c = null;
+          return `<option value="${escAttr(t.code)}"${t.code===now?' selected':''}>${
+            escHtml(`${t.name} (${t.members.length})` + (c ? ` — had ${c.name} this month` : ''))}</option>`;
+        }).join('')}
       </select></div>`;
   }).join('');
   checkRotationClashes();
@@ -9432,6 +9530,38 @@ async function applyRotation(){
     .map(p => ({ staffId: p.dataset.staff, group: p.value }))
     .filter(p => (currentTeamsOf(p.staffId)[0] || '') !== p.group);
   if (!picks.length){ toast('NOTHING TO CHANGE','inf'); return; }
+
+  // Rotating inside a month would hand somebody a second team for it. The
+  // rotation is a month-boundary action; doing it mid-month needs saying so.
+  const moving = picks.filter(p => p.group);
+  const sameMonth = moving.filter(p => {
+    const c = staffMonthConflict(p.staffId, p.group);
+    if (!c) return false;
+    // The team they are handing over in this same rotation is not a clash with
+    // itself — without this every ordinary rotation would raise the warning.
+    if (c.open && currentTeamsOf(p.staffId).includes(c.group)) return false;
+    return true;
+  });
+  if (sameMonth.length){
+    const names = sameMonth.map(p => {
+      const c = staffMonthConflict(p.staffId, p.group);
+      return `${staffById(p.staffId)?.name || '?'} already has ${c.name}`;
+    }).join('\n');
+    if (!confirm(`This rotation gives someone a second team inside ${monthLabel(thisMonthKey())}:\n\n${names}\n\nA month should be one team per person. Apply anyway?`)) return;
+  }
+
+  // Swapping seats part-way through a month still leaves each mover holding
+  // two teams for it — the one handed over and the one taken. The rotation is
+  // meant for a month boundary, so say so once rather than per person.
+  const today = new Date();
+  const swapping = picks.filter(p => p.group && currentTeamsOf(p.staffId).length);
+  if (today.getDate() !== 1 && swapping.length){
+    const who = swapping.map(p => staffById(p.staffId)?.name || '?').join(', ');
+    if (!confirm(
+      `Today is the ${today.getDate()}${['th','st','nd','rd'][(today.getDate()%10>3||[11,12,13].includes(today.getDate()))?0:today.getDate()%10]} of ${monthLabel(thisMonthKey())}, not the 1st.\n\n` +
+      `${who} will have held two teams in ${monthLabel(thisMonthKey())} — the one being handed over and the new one.\n\n` +
+      `If this rotation is for next month, apply it on the 1st instead. Apply now anyway?`)) return;
+  }
 
   const now = new Date().toISOString();
   // Close every seat that is moving before opening any, or a team handed from
