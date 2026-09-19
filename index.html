@@ -2424,9 +2424,7 @@ td { border: none; }
             <th style="width:34px;">#</th>
             <th style="width:92px;">CODE</th>
             <th style="width:140px;">ID / AADHAAR <span class="req">*</span></th>
-            <th style="width:150px;">NAME <span class="req">*</span></th>
-            <th style="width:120px;">SURNAME</th>
-            <th style="width:150px;">FATHER / SPOUSE</th>
+            <th style="width:180px;">NAME <span class="req">*</span></th>
             <th style="width:110px;">DOB <span class="req">*</span></th>
             <th style="width:56px;" title="Type m, f or o">SEX <span class="req">*</span></th>
             <th style="width:120px;">MOBILE <span class="req">*</span></th>
@@ -9797,7 +9795,12 @@ loadStaff();
 // Values live in the inputs rather than in a parallel array. One copy means
 // the grid and the save can never disagree about what was typed.
 
-const FAST_COLS = ['code','idNumber','sevakName','surName','fatherOrSpouseName','dob','gender','mobileNo',
+// Surname and father/spouse are off the grid: they were two columns of
+// scrolling for fields that are not required and are quicker to add on the
+// record itself when they matter. Leaving them out of this list also keeps
+// them out of a PATCH, so opening a team and saving a correction does not
+// blank what is already stored in them.
+const FAST_COLS = ['code','idNumber','sevakName','dob','gender','mobileNo',
                    'doorNo','street','city','district','pincode','state'];
 const FAST_REQ  = ['idNumber','sevakName','dob','gender','mobileNo','state'];   // code comes from the numbering
 // What a new row inherits from the bar above it. These are a starting point,
@@ -9850,8 +9853,6 @@ function addFastRow(prefill){
     cell('code') +
     cell('idNumber', 'inputmode="numeric" maxlength="14"') +
     cell('sevakName') +
-    cell('surName') +
-    cell('fatherOrSpouseName') +
     cell('dob', 'placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric"') +
     cell('gender', 'maxlength="6" title="m, f or o" class="fast-in fast-sex"') +
     cell('mobileNo', 'type="tel" maxlength="10" inputmode="numeric"') +
@@ -9979,8 +9980,7 @@ function fastNormalise(row, f){
   if (f === 'dob')      el.value = normDob(v) || v;
   if (f === 'idNumber') el.value = v.replace(/\s+/g,'');
   if (f === 'mobileNo') el.value = v.replace(/\D/g,'').slice(-10);
-  if (f === 'sevakName' || f === 'surName' || f === 'fatherOrSpouseName')
-    el.value = toProperCase(cleanName(v));
+  if (f === 'sevakName') el.value = toProperCase(cleanName(v));
   if (f === 'pincode') el.value = v.replace(/\D/g,'').slice(0,6);
   if (f === 'state')   el.value = matchState(v) || tidyPlace(v);
   if (f === 'city' || f === 'district' || f === 'street') el.value = tidyPlace(v);
@@ -10205,6 +10205,24 @@ function fastValidate(){
 }
 
 // ── save ─────────────────────────────────────────────────────────
+// The register form hands every person a generated address. The grid has no
+// email column, so it was saving them without one — the same people, entered
+// the faster way, ending up with a field the others all have. It is minted at
+// save time instead of typed: the form's shape, de-duplicated against the
+// registry and against the rest of the sheet going in with it.
+function fastAutoEmail(row, alsoTaken){
+  const name = fastVal(row,'sevakName').replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
+  if (!name) return '';
+  const p  = normDob(fastVal(row,'dob')).split('/');
+  const dp = (p.length === 3 && p[2].length === 4) ? p[0]+p[1]+p[2].slice(-2) : '';
+  const taken = new Set(allRecords.map(r => String(r.email||'').trim().toLowerCase()).filter(Boolean));
+  (alsoTaken || []).forEach(a => taken.add(String(a).toLowerCase()));
+  const base = `${name}${dp}`;
+  let addr = `${base}@${AUTO_EMAIL_DOMAIN}`;
+  for (let n = 2; taken.has(addr.toLowerCase()); n++) addr = `${base}${n}@${AUTO_EMAIL_DOMAIN}`;
+  return addr;
+}
+
 async function fastSaveAll(){
   if (!SB_URL){ toast('CONNECT TO SUPABASE FIRST','err'); return; }
 
@@ -10229,8 +10247,12 @@ async function fastSaveAll(){
     box.appendChild(d); box.scrollTop = box.scrollHeight;
   };
 
-  let ok = 0, failed = 0;
+  let ok = 0, failed = 0, mailed = 0;
   const fresh = [];
+  // Addresses minted during this run count as taken for the rest of it, or two
+  // people with the same name and birthday in one sheet would share one.
+  const minted = [];
+  const hasEmailCol = tableColumns.size === 0 || tableColumns.has('email');
   for (let n = 0; n < todo.length; n++){
     const r = todo[n];
     btn.textContent = `⏳ ${n+1} / ${todo.length}`;
@@ -10239,8 +10261,17 @@ async function fastSaveAll(){
     if (fastPhotos[r]) raw.photoBase64 = fastPhotos[r];
     raw.dob = normDob(raw.dob);
     raw.gender = normGender(raw.gender);
-    const label = `${raw.code} ${raw.sevakName||''} ${raw.surName||''}`.trim();
     const tr = document.querySelector(`#fast-body tr[data-row="${r}"]`);
+
+    // Someone opened from the registry who already has an address keeps it —
+    // generating over the top would replace a real one with a guess.
+    const existingRec = tr.dataset.existing
+      ? allRecords.find(x => String(x.id) === String(tr.dataset.existing)) : null;
+    if (hasEmailCol && !String(existingRec?.email || '').trim()){
+      const addr = fastAutoEmail(r, minted);
+      if (addr){ raw.email = addr; minted.push(addr); mailed++; }
+    }
+    const label = `${raw.code} ${raw.sevakName||''}`.trim();
     try {
       // A row opened from the registry is patched by the id it came from, so
       // a corrected ID number updates that person instead of creating a second.
@@ -10264,7 +10295,7 @@ async function fastSaveAll(){
       FAST_COLS.forEach(f => { const el = fastEl(r,f); if (el) el.readOnly = true; });
       if (!existingId && Array.isArray(res.rows) && res.rows[0]) fresh.push(res.rows[0]);
       say(res.action === 'updated' ? '#1A56FF' : '#00C16A',
-          `${res.action === 'updated' ? '↻' : '✓'} ${label}`);
+          `${res.action === 'updated' ? '↻' : '✓'} ${label}` + (raw.email ? `  ·  ${raw.email}` : ''));
       ok++;
     } catch(e){
       tr.querySelector('.fast-status').innerHTML =
@@ -10287,7 +10318,9 @@ async function fastSaveAll(){
   btn.textContent = '⚡ SAVE ALL';
   fastValidate();
   scheduleFastDraft();
-  toast(failed ? `SAVED ${ok}, ${failed} FAILED — SEE THE LOG` : `SAVED ${ok} PEOPLE`, failed ? 'err' : 'ok');
+  toast(failed ? `SAVED ${ok}, ${failed} FAILED — SEE THE LOG`
+               : `SAVED ${ok} PEOPLE${mailed ? ` · ${mailed} EMAIL${mailed===1?'':'S'} GENERATED` : ''}`,
+        failed ? 'err' : 'ok');
   if (!failed) clearDirty();
 }
 
