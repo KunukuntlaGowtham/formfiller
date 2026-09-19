@@ -2436,11 +2436,18 @@ td { border: none; }
          totals then follow from each person's code, with nothing to keep in step by hand.</p>
     </div>
     <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-      <div class="search-wrap" style="max-width:210px;">
+      <div class="search-wrap" style="max-width:190px;">
         <span class="ico" aria-hidden="true">⌕</span>
-        <input type="text" id="staff-search" placeholder="Search staff, team, leader…" aria-label="Search staff" oninput="renderStaff()" />
+        <input type="text" id="staff-search" placeholder="Search staff, team…" aria-label="Search staff" oninput="renderStaff()" />
       </div>
-      <button class="nb nb-yellow" onclick="openRotation()" title="Give every staff member their team for the new month">🔄 NEW MONTH</button>
+      <span class="tb-group">
+        <button class="nb nb-ghost nb-sm" onclick="staffMonthStep(-1)" title="Previous month">‹</button>
+        <select class="nb-select nb-sm" id="staff-month" onchange="staffMonth=this.value;renderStaff()"
+                aria-label="Month being planned" title="Month being planned"></select>
+        <button class="nb nb-ghost nb-sm" onclick="staffMonthStep(1)" title="Next month — plan ahead">›</button>
+        <button class="nb nb-ghost nb-sm" onclick="copyPrevMonthPlan()" title="Copy the previous month's plan into this one">⧉</button>
+      </span>
+      <button class="nb nb-yellow" onclick="openRotation()" title="Set every staff member's team for a month — including one ahead">PLAN MONTH</button>
       <span class="tb-group" title="Reports">
         <button class="nb nb-red"  onclick="printStaffReport()"   title="Staff, their team, the team leader and member counts">📄 STAFF</button>
         <button class="nb nb-blue" onclick="printMonthlyReport()" title="Month by month, how many joined each team">📅 MONTHLY</button>
@@ -2713,16 +2720,21 @@ td { border: none; }
 <div class="overlay" id="rotate-overlay">
   <div class="modal" style="max-width:620px;" role="dialog" aria-modal="true" aria-label="Monthly rotation">
     <button class="btn-x" onclick="closeRotation()" title="Close" aria-label="Close">✕</button>
-    <div class="modal-title">🔄 NEW MONTH <span class="hi">ROTATION</span></div>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.7;">
-      Give each staff member the team they take from today. Whatever they held before is closed off
-      with today's date and kept in the history — the year-end report still shows it.
+    <div class="modal-title">PLAN A <span class="hi">MONTH</span></div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.7;">
+      Set every staff member's team for one month. Pick a month ahead to plan it now — nothing about
+      the months already set is touched, and each one keeps its own record for the year-end report.
     </p>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
+      <label for="rotate-month" style="font-family:'Space Mono',monospace;font-size:11px;
+             letter-spacing:1px;color:var(--muted);">MONTH</label>
+      <select class="nb-select nb-sm" id="rotate-month" onchange="renderRotationRows()" aria-label="Month to plan"></select>
+    </div>
     <div id="rotate-rows" style="max-height:44vh;overflow-y:auto;margin-bottom:14px;"></div>
     <div id="rotate-warn" style="font-family:'Space Mono',monospace;font-size:11px;min-height:18px;margin-bottom:10px;"></div>
     <div class="modal-footer">
       <button class="nb nb-ghost" onclick="closeRotation()">CANCEL</button>
-      <button class="nb nb-green" id="rotate-btn" onclick="applyRotation()">🔄 APPLY ROTATION</button>
+      <button class="nb nb-green" id="rotate-btn" onclick="applyRotation()">SET THIS MONTH</button>
     </div>
   </div>
 </div>
@@ -8874,12 +8886,12 @@ const CLOUD_KEY   = 'sevak_staff';
 // ── storage ──────────────────────────────────────────────────────
 async function loadStaff(){
   staffList        = (await idbGet('staffList'))        || [];
-  staffAssignments = (await idbGet('staffAssignments')) || [];
+  staffAssignments = migrateAssignments(await idbGet('staffAssignments'));
   // Upgrade the older shape (one live map, no history) without losing it.
   const legacy = await idbGet('staffTeams');
   if (legacy && !staffAssignments.length){
     staffAssignments = Object.entries(legacy).map(([group, staffId]) => ({
-      id: newAssignmentId(), staffId, group, from: new Date().toISOString(), to: null
+      id: newAssignmentId(), staffId, group, month: thisMonthKey()
     }));
     await idbSet('staffAssignments', staffAssignments);
   }
@@ -9002,7 +9014,7 @@ async function staffAfterConnect(){
     const mine = (await idbGet('staffSavedAt')) || '';
     if (!mine || (cloud.savedAt || '') > mine){
       staffList        = cloud.staffList || [];
-      staffAssignments = cloud.staffAssignments || [];
+      staffAssignments = migrateAssignments(cloud.staffAssignments);
       await idbSet('staffList', staffList);
       await idbSet('staffAssignments', staffAssignments);
       if (cloud.teamNames)    { teamNames    = cloud.teamNames;    await idbSet('teamNames', teamNames); }
@@ -9018,34 +9030,80 @@ async function staffAfterConnect(){
   if (document.getElementById('pg-staff')?.classList.contains('active')) renderStaff();
 }
 
-// ── lookups ──────────────────────────────────────────────────────
-const staffById = id => staffList.find(s => String(s.id) === String(id)) || null;
-const openAssignments = () => staffAssignments.filter(a => !a.to);
+// ── the model ────────────────────────────────────────────────────
+// An assignment belongs to a MONTH, not to a stretch of time: "Ravi books AA
+// in December". Open-ended ranges starting at the moment you pressed the
+// button were the wrong shape twice over — you could not plan a month that
+// had not arrived, and changing your mind meant arguing with the overlap
+// rules instead of just picking again.
+//
+//   { id, staffId, group, month: 'YYYY-MM' }
+//
+// One row per staff member per month falls out of that, so the rule needs no
+// enforcing, and a row for a future month is simply a plan.
 
-function staffOfTeam(group){
-  const a = openAssignments().find(x => x.group === group);
+const staffById = id => staffList.find(s => String(s.id) === String(id)) || null;
+const thisMonthKey = () => monthKey(new Date());
+
+// Which month the staff screen is looking at. The month view keeps its own.
+let staffMonth = null;
+const staffMonthKey = () => staffMonth || thisMonthKey();
+
+const assignmentsFor = key => staffAssignments.filter(a => a.month === key);
+
+function staffOfTeam(group, key){
+  const a = assignmentsFor(key || staffMonthKey()).find(x => x.group === group);
   return a ? staffById(a.staffId) : null;
 }
-function currentTeamsOf(staffId){
-  return openAssignments().filter(a => String(a.staffId) === String(staffId)).map(a => a.group);
+function teamOfStaff(staffId, key){
+  const a = assignmentsFor(key || staffMonthKey()).find(x => String(x.staffId) === String(staffId));
+  return a ? a.group : '';
+}
+// Kept for the callers that only ever wanted the one team.
+function currentTeamsOf(staffId, key){
+  const g = teamOfStaff(staffId, key);
+  return g ? [g] : [];
 }
 
-// Assignments touching a window — how "teams handled during 2026" is answered.
-function assignmentsInRange(fromISO, toISO){
-  return staffAssignments.filter(a => {
-    const start = a.from || '';
-    const end   = a.to || '9999';
-    return start <= toISO && end >= fromISO;
-  });
+// Every month a staff member has been given something, newest first.
+function monthsOfStaff(staffId){
+  return [...new Set(staffAssignments
+    .filter(a => String(a.staffId) === String(staffId)).map(a => a.month))].sort().reverse();
 }
+
 function yearsCovered(){
   const ys = new Set([String(new Date().getFullYear())]);
-  staffAssignments.forEach(a => {
-    if (a.from) ys.add(a.from.slice(0,4));
-    if (a.to)   ys.add(a.to.slice(0,4));
-  });
+  staffAssignments.forEach(a => { if (a.month) ys.add(a.month.slice(0,4)); });
   allRecords.forEach(r => { const d = createdOf(r); if (d) ys.add(String(d.getFullYear())); });
   return [...ys].sort().reverse();
+}
+
+// Rows written before this — open-ended ranges — become a row per month they
+// covered, so nothing that was already assigned is lost.
+function migrateAssignments(list){
+  const out = [];
+  const seen = new Set();
+  (list || []).forEach(a => {
+    if (a.month){
+      const k = a.staffId + '|' + a.month;
+      if (!seen.has(k)){ seen.add(k); out.push({ id:a.id, staffId:a.staffId, group:a.group, month:a.month }); }
+      return;
+    }
+    const start = (a.from || new Date().toISOString()).slice(0,7);
+    const end   = (a.to || new Date().toISOString()).slice(0,7);
+    let [y, m] = start.split('-').map(Number);
+    for (let guard = 0; guard < 36; guard++){
+      const k = `${y}-${String(m).padStart(2,'0')}`;
+      const dedupe = a.staffId + '|' + k;
+      if (!seen.has(dedupe)){
+        seen.add(dedupe);
+        out.push({ id: newAssignmentId(), staffId: a.staffId, group: a.group, month: k });
+      }
+      if (k >= end) break;
+      m++; if (m > 12){ m = 1; y++; }
+    }
+  });
+  return out;
 }
 
 // ── months ───────────────────────────────────────────────────────
@@ -9058,28 +9116,8 @@ function monthsPresent(){
   return [...set].sort().reverse();
 }
 const countInMonth = (members, key) => members.filter(r => monthOf(r) === key).length;
-const thisMonthKey = () => monthKey(new Date());
 
-// Members registered while this staff member actually held the team.
-function countInWindow(members, fromISO, toISO){
-  return members.filter(r => {
-    const d = createdOf(r);
-    if (!d) return false;
-    const iso = d.toISOString();
-    return iso >= fromISO && iso <= toISO;
-  }).length;
-}
 
-// ── the form ─────────────────────────────────────────────────────
-function staffTeamOptions(selected){
-  const teams = buildTeams().filter(t => t.real);
-  return '<option value="">— none yet —</option>' + teams.map(t => {
-    const taken = staffOfTeam(t.code);
-    const mine  = selected && t.code === selected;
-    return `<option value="${escAttr(t.code)}"${mine?' selected':''}>${
-      escHtml(`${t.name} (${t.members.length})` + (taken && !mine ? ` — ${taken.name}` : ''))}</option>`;
-  }).join('');
-}
 
 async function saveStaffMember(){
   const name   = document.getElementById('staff-name').value.trim();
@@ -9143,88 +9181,8 @@ async function removeStaff(id){
   renderStaff();
 }
 
-// A hand-over closes the old row and opens a new one, so both are on record.
-// One team per staff member per month. A hand-over inside a month would
-// leave that person credited with two teams for it, which is not how the
-// booking works — so it is refused at the point of assignment rather than
-// discovered in a year-end report.
-function staffMonthConflict(staffId, group, key){
-  if (!staffId) return null;
-  const { from, to } = monthRange(key || thisMonthKey());
-  const clash = staffAssignments.find(a =>
-    String(a.staffId) === String(staffId) &&
-    a.group !== group &&
-    (a.from || '') <= to && (a.to || '9999') >= from);
-  if (!clash) return null;
-  const t = buildTeams().find(x => x.code === clash.group);
-  return { group: clash.group, name: t ? t.name : clash.group, open: !clash.to };
-}
 
-// A move that leaves somebody with two teams inside one month is unusual
-// enough to ask about and ordinary enough to allow. Returns false only if the
-// person says no.
-function monthMoveOk(staffId, group, current){
-  const s = staffById(staffId);
-  if (!s) return true;
-  const name = g => buildTeams().find(t => t.code === g)?.name || g;
-  const { from, to } = monthRange(thisMonthKey());
 
-  // Everything they have already been on this month, not just the first one
-  // found — after two moves "already been on AA" would be stale advice.
-  const had = [...new Set(staffAssignments
-    .filter(a => String(a.staffId) === String(staffId) && a.group !== group &&
-                 (a.from || '') <= to && (a.to || '9999') >= from)
-    .map(a => a.group))].map(name);
-  if (!had.length) return true;
-
-  const list = had.length === 1 ? had[0]
-             : had.slice(0, -1).join(', ') + ' and ' + had[had.length - 1];
-  return confirm(
-    `${s.name} has already been on ${list} during ${monthLabel(thisMonthKey())}.\n\n` +
-    `Putting them on ${name(group)} as well makes ${had.length + 1} teams for them this month. ` +
-    `All of them stay in the history and show in the year-end report with the dates each was held.\n\nGo ahead?`);
-}
-
-// Changing who books a team, or which team somebody books, is a move: the
-// seat being left closes as the new one opens. Doing it as an add would trip
-// the one-team-a-month rule against the very team they are leaving.
-async function setStaffTeam(staffId, group){
-  const s = staffById(staffId);
-  if (!s) return;
-  const current = currentTeamsOf(staffId)[0] || '';
-  if (current === group){ renderStaff(); return; }
-
-  // One team a month is how this is meant to run, not a lock. Locking it
-  // meant a staff member who had already moved once could not be moved again
-  // until the month turned, which is not a decision the app gets to make.
-  if (group && !monthMoveOk(staffId, group, current)){ refreshBookingViews(); return; }
-
-  const now = new Date().toISOString();
-  staffAssignments.forEach(a => {
-    if (!a.to && (String(a.staffId) === String(staffId) || a.group === group)) a.to = now;
-  });
-  if (group) staffAssignments.push({ id: newAssignmentId(), staffId, group, from: now, to: null });
-  await idbSet('staffSavedAt', now);
-  await persistStaff();
-  const tn = group ? (buildTeams().find(t => t.code === group)?.name || group) : null;
-  toast(tn ? `${s.name.toUpperCase()} → ${tn.toUpperCase()}` : `${s.name.toUpperCase()} HAS NO TEAM`, 'ok');
-  refreshBookingViews();
-}
-
-// Same move from the team's side, which is how the month view edits it.
-async function setTeamStaff(group, staffId){
-  if (!staffId){
-    const open = openAssignments().find(a => a.group === group);
-    if (!open) return;
-    open.to = new Date().toISOString();
-    await idbSet('staffSavedAt', open.to);
-    await persistStaff();
-    toast(`${group.toUpperCase()} UNASSIGNED`, 'inf');
-    refreshBookingViews();
-    return;
-  }
-  await setStaffTeam(staffId, group);
-}
 
 function refreshBookingViews(){
   cancelStaffEdit();
@@ -9233,43 +9191,209 @@ function refreshBookingViews(){
   if (document.getElementById('pg-teams')?.classList.contains('active')) renderTeams();
 }
 
-async function assignTeamTo(group, staffId, quiet){
-  if (staffId && !monthMoveOk(staffId, group, currentTeamsOf(staffId)[0] || '')){
-    renderStaff();
-    return;
-  }
-  const now = new Date().toISOString();
-  const open = openAssignments().find(a => a.group === group);
-  if (open){
-    if (String(open.staffId) === String(staffId)) return;
-    open.to = now;
-  }
-  if (staffId) staffAssignments.push({ id: newAssignmentId(), staffId, group, from: now, to: null });
-  await idbSet('staffSavedAt', now);
-  await persistStaff();
-  if (!quiet){
-    const s = staffById(staffId);
-    toast(s ? `${s.name.toUpperCase()} NOW BOOKS ${group.toUpperCase()}` : `${group.toUpperCase()} UNASSIGNED`,'ok');
-  } else { toast('STAFF SAVED','ok'); }
-  cancelStaffEdit();
-  renderStaff();
-  if (document.getElementById('pg-teams').classList.contains('active')) renderTeams();
+
+
+// ── lookups the screens use ──────────────────────────────────────
+function staffTeamOptions(selected, key){
+  const teams = buildTeams().filter(t => t.real);
+  return '<option value="">— none —</option>' + teams.map(t => {
+    const taken = staffOfTeam(t.code, key);
+    const mine  = selected && t.code === selected;
+    return `<option value="${escAttr(t.code)}"${mine?' selected':''}>${
+      escHtml(`${t.name} (${t.members.length})` + (taken && !mine ? ` — with ${taken.name}` : ''))}</option>`;
+  }).join('');
 }
 
-// ── the screen ───────────────────────────────────────────────────
-function staffRows(){
+// ── setting a month's assignment ─────────────────────────────────
+// Picking is a replacement, not a negotiation: one staff member, one month,
+// one team. The row is swapped and that is the whole operation — no dates to
+// reconcile, no overlap to refuse, and a month that has not arrived yet works
+// exactly like the one in progress.
+async function setStaffTeam(staffId, group, key){
+  const k = key || staffMonthKey();
+  const s = staffById(staffId);
+  if (!s) return;
+  staffAssignments = staffAssignments.filter(a =>
+    !(a.month === k && (String(a.staffId) === String(staffId) || a.group === group)));
+  if (group) staffAssignments.push({ id: newAssignmentId(), staffId, group, month: k });
+  await idbSet('staffSavedAt', new Date().toISOString());
+  await persistStaff();
+  const tn = group ? (buildTeams().find(t => t.code === group)?.name || group) : null;
+  toast(tn ? `${s.name.toUpperCase()} → ${tn.toUpperCase()} · ${monthLabel(k).toUpperCase()}`
+           : `${s.name.toUpperCase()} HAS NO TEAM IN ${monthLabel(k).toUpperCase()}`, 'ok');
+  refreshBookingViews();
+}
+
+// The same from the team's side, which is how the month view edits it.
+async function setTeamStaff(group, staffId, key){
+  const k = key || staffMonthKey();
+  if (!staffId){
+    staffAssignments = staffAssignments.filter(a => !(a.month === k && a.group === group));
+    await idbSet('staffSavedAt', new Date().toISOString());
+    await persistStaff();
+    toast(`${group.toUpperCase()} UNASSIGNED IN ${monthLabel(k).toUpperCase()}`, 'inf');
+    refreshBookingViews();
+    return;
+  }
+  await setStaffTeam(staffId, group, k);
+}
+
+// Copying a month is how a plan actually gets made: December is usually
+// November with two swaps, not twelve fresh decisions.
+async function copyMonthPlan(fromKey, toKey){
+  const src = assignmentsFor(fromKey);
+  if (!src.length){ toast(`NOTHING TO COPY FROM ${monthLabel(fromKey).toUpperCase()}`,'err'); return; }
+  const existing = assignmentsFor(toKey).length;
+  if (existing && !confirm(`${monthLabel(toKey)} already has ${existing} assignment(s).\n\nReplace them with ${monthLabel(fromKey)}'s ${src.length}?`)) return;
+  staffAssignments = staffAssignments.filter(a => a.month !== toKey);
+  src.forEach(a => staffAssignments.push({ id:newAssignmentId(), staffId:a.staffId, group:a.group, month:toKey }));
+  await idbSet('staffSavedAt', new Date().toISOString());
+  await persistStaff();
+  staffMonth = toKey;
+  toast(`${monthLabel(fromKey).toUpperCase()} COPIED TO ${monthLabel(toKey).toUpperCase()}`,'ok');
+  refreshBookingViews();
+}
+
+function staffRows(key){
+  const k = key || staffMonthKey();
   const byCode = Object.fromEntries(buildTeams().map(t => [t.code, t]));
-  const mk = thisMonthKey();
   return staffList.map(s => {
-    const teams = currentTeamsOf(s.id).map(g => byCode[g]).filter(Boolean);
-    const past  = [...new Set(staffAssignments
+    const g = teamOfStaff(s.id, k);
+    const t = g ? byCode[g] : null;
+    const everGroups = [...new Set(staffAssignments
       .filter(a => String(a.staffId) === String(s.id)).map(a => a.group))];
     return {
-      staff: s, teams, everGroups: past,
-      members: teams.reduce((n,t) => n + t.members.length, 0),
-      month:   teams.reduce((n,t) => n + countInMonth(t.members, mk), 0)
+      staff: s, teams: t ? [t] : [], everGroups,
+      members: t ? t.members.length : 0,
+      month:   t ? countInMonth(t.members, k) : 0
     };
   });
+}
+
+// Every other month that has a plan, newest first. The plan and the record of
+// what was planned are the same thing here.
+function renderAssignmentHistory(){
+  const months = [...new Set(staffAssignments.map(a => a.month))].sort().reverse()
+    .filter(m => m !== staffMonthKey());
+  if (!months.length) return '';
+  const names  = Object.fromEntries(staffList.map(s => [String(s.id), s.name]));
+  const byCode = Object.fromEntries(buildTeams().map(t => [t.code, t.name]));
+  const now = thisMonthKey();
+  return `<div class="d-section" style="margin-top:18px;">
+    <div class="d-head">🕘 OTHER MONTHS (${months.length})</div>
+    <div style="padding:10px 14px;font-family:'Space Mono',monospace;font-size:11px;line-height:2;">` +
+    months.slice(0, 18).map(m => `<div>
+      <a href="#" onclick="event.preventDefault();staffMonth='${m}';renderStaff();"
+         style="color:var(--lav-700);font-weight:700;text-decoration:none;">${escHtml(monthLabel(m))}</a>
+      ${m > now ? '<span style="color:var(--green);font-size:9px;"> PLANNED</span>' : ''}
+      <span style="color:var(--muted);"> · </span>` +
+      assignmentsFor(m).map(a => `${escHtml(names[String(a.staffId)] || 'removed')} → ${
+        escHtml(byCode[a.group] || a.group)}`).join('<span style="color:var(--muted);"> · </span>') +
+      `</div>`).join('') +
+    (months.length > 18 ? `<div style="color:var(--muted);">…and ${months.length - 18} more.</div>` : '') +
+    '</div></div>';
+}
+
+function renderUnassignedTeams(allTeams){
+  const box = document.getElementById('staff-unassigned');
+  const k = staffMonthKey();
+  const free = allTeams.filter(t => !staffOfTeam(t.code, k));
+  if (!free.length || !staffList.length){ box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="d-section"><div class="d-head">⚠ NO STAFF IN ${escHtml(monthLabel(k).toUpperCase())} (${free.length})</div>
+    <div style="padding:14px;display:flex;gap:10px;flex-wrap:wrap;">` +
+    free.map(t => `<div style="border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:8px 10px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:5px;">${escHtml(t.name)}
+        <span style="color:var(--muted);font-weight:400;">· ${t.members.length}</span></div>
+      <select class="nb-select nb-sm" onchange="setTeamStaff('${escAttr(t.code)}', this.value)" aria-label="Assign staff to ${escAttr(t.name)}">
+        <option value="">— assign staff —</option>
+        ${staffList.map(s => {
+          const busy = teamOfStaff(s.id, k);
+          return `<option value="${escAttr(s.id)}">${escHtml(s.name + (busy ? ` — on ${busy}` : ''))}</option>`;
+        }).join('')}
+      </select></div>`).join('') + '</div></div>';
+}
+
+// ── planning a month ─────────────────────────────────────────────
+function openRotation(){
+  if (!staffList.length){ toast('ADD STAFF FIRST','err'); return; }
+  const teams = buildTeams().filter(t => t.real);
+  if (!teams.length){ toast('NO TEAMS IN THE REGISTRY YET','err'); return; }
+  const sel = document.getElementById('rotate-month');
+  sel.innerHTML = monthOptions().map(k =>
+    `<option value="${k}"${k===staffMonthKey()?' selected':''}>${escHtml(monthLabel(k))}${
+      k > thisMonthKey() ? ' — planning ahead' : ''}</option>`).join('');
+  renderRotationRows();
+  openOverlay('rotate-overlay');
+}
+
+function renderRotationRows(){
+  const k = document.getElementById('rotate-month').value;
+  const teams = buildTeams().filter(t => t.real);
+  document.getElementById('rotate-rows').innerHTML = staffList.map(s => {
+    const now  = teamOfStaff(s.id, k);
+    const prev = monthsOfStaff(s.id).filter(m => m < k)[0];
+    const had  = prev ? teamOfStaff(s.id, prev) : '';
+    return `<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);">
+      <div style="flex:1 1 150px;">
+        <strong>${escHtml(s.name)}</strong>
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">
+          ${escHtml(s.role || 'Coordinator')}${had ? ` · ${escHtml(monthLabel(prev))}: ${escHtml(had)}` : ''}</div>
+      </div>
+      <select class="nb-select nb-sm" data-staff="${escAttr(s.id)}" style="flex:0 1 210px;"
+              onchange="checkRotationClashes()" aria-label="Team for ${escAttr(s.name)}">
+        <option value="">— none —</option>
+        ${teams.map(t => `<option value="${escAttr(t.code)}"${t.code===now?' selected':''}>${
+          escHtml(t.name)} (${t.members.length})</option>`).join('')}
+      </select></div>`;
+  }).join('');
+  checkRotationClashes();
+}
+
+// Two people on one team in one month is always a slip, so that one is still
+// caught before anything is written.
+function checkRotationClashes(){
+  const picks = [...document.querySelectorAll('#rotate-rows select')];
+  const seen = {}, dupes = new Set();
+  picks.forEach(p => {
+    if (!p.value) return;
+    if (seen[p.value]) dupes.add(p.value); else seen[p.value] = true;
+  });
+  picks.forEach(p => p.style.borderColor = dupes.has(p.value) ? 'var(--red)' : '');
+  const warn = document.getElementById('rotate-warn');
+  const btn  = document.getElementById('rotate-btn');
+  const k = document.getElementById('rotate-month').value;
+  if (dupes.size){
+    warn.style.color = 'var(--red)';
+    warn.textContent = `⚠ ${[...dupes].join(', ').toUpperCase()} PICKED TWICE — ONE TEAM, ONE STAFF MEMBER`;
+    btn.disabled = true;
+  } else {
+    const changing = picks.filter(p => (teamOfStaff(p.dataset.staff, k) || '') !== p.value).length;
+    warn.style.color = 'var(--muted)';
+    warn.textContent = changing ? `${changing} CHANGE${changing===1?'':'S'} FOR ${monthLabel(k).toUpperCase()}`
+                                : `NOTHING CHANGED FOR ${monthLabel(k).toUpperCase()}`;
+    btn.disabled = !changing;
+  }
+}
+
+async function applyRotation(){
+  const k = document.getElementById('rotate-month').value;
+  const picks = [...document.querySelectorAll('#rotate-rows select')]
+    .map(p => ({ staffId: p.dataset.staff, group: p.value }))
+    .filter(p => (teamOfStaff(p.staffId, k) || '') !== p.group);
+  if (!picks.length){ toast('NOTHING TO CHANGE','inf'); return; }
+
+  staffAssignments = staffAssignments.filter(a =>
+    !(a.month === k && (picks.some(p => String(p.staffId) === String(a.staffId)) ||
+                        picks.some(p => p.group === a.group))));
+  picks.forEach(p => {
+    if (p.group) staffAssignments.push({ id:newAssignmentId(), staffId:p.staffId, group:p.group, month:k });
+  });
+  await idbSet('staffSavedAt', new Date().toISOString());
+  await persistStaff();
+  closeRotation();
+  staffMonth = k;
+  refreshBookingViews();
+  toast(`${monthLabel(k).toUpperCase()} SET — ${picks.length} CHANGE${picks.length===1?'':'S'}`,'ok');
 }
 
 function renderStaff(){
@@ -9277,6 +9401,13 @@ function renderStaff(){
   const sel  = document.getElementById('staff-team');
   if (sel && staffEditId === null) sel.innerHTML = staffTeamOptions('');
 
+  const mSel = document.getElementById('staff-month');
+  if (mSel){
+    const k = staffMonthKey();
+    mSel.innerHTML = monthOptions().map(m =>
+      `<option value="${m}"${m===k?' selected':''}>${escHtml(monthLabel(m))}${
+        m > thisMonthKey() ? ' · plan' : m < thisMonthKey() ? ' · past' : ''}</option>`).join('');
+  }
   const yearSel = document.getElementById('staff-year');
   if (yearSel){
     const keep = yearSel.value;
@@ -9293,12 +9424,12 @@ function renderStaff(){
   }
 
   const allTeams = buildTeams().filter(t => t.real);
-  const rows = staffRows();
-  const mk = thisMonthKey();
+  const mk = staffMonthKey();
+  const rows = staffRows(mk);
 
   const strip = document.getElementById('staff-strip');
   strip.style.display = '';
-  const assigned = allTeams.filter(t => staffOfTeam(t.code)).length;
+  const assigned = allTeams.filter(t => staffOfTeam(t.code, mk)).length;
   strip.innerHTML = `
     <div class="stat c1"><div class="v">${staffList.length}</div><div class="l">STAFF</div></div>
     <div class="stat c2"><div class="v">${assigned}</div><div class="l">TEAMS BOOKED</div></div>
@@ -9329,7 +9460,7 @@ function renderStaff(){
   const dated = !!createdCol;
   body.innerHTML = `<div class="table-card"><div class="table-scroll"><table>
     <thead><tr>
-      <th>STAFF</th><th>MOBILE</th><th>ROLE</th><th>TEAM BOOKED NOW</th><th>TEAM LEADER</th>
+      <th>STAFF</th><th>MOBILE</th><th>ROLE</th><th>TEAM IN ${escHtml(monthLabel(mk).toUpperCase())}</th><th>TEAM LEADER</th>
       <th style="text-align:right">MEMBERS</th>
       <th style="text-align:right" title="${dated?'Registered this month':'Needs a created_at column'}">${escHtml(monthLabel(mk).toUpperCase())}</th>
       <th style="text-align:right" title="Teams this person has handled, past and present">TEAMS EVER</th>
@@ -9338,24 +9469,16 @@ function renderStaff(){
     shown.map(({ staff: s, teams, members, month, everGroups }) => {
       const t = teams[0], L = t?.leader;
       const mine = teams[0]?.code || '';
-      const openA = mine ? openAssignments().find(o => o.group === mine) : null;
       const teamCell = `<select class="cell-sel" onchange="setStaffTeam('${escAttr(s.id)}', this.value)"
-                                aria-label="Team booked by ${escAttr(s.name)}">
+                                aria-label="Team booked by ${escAttr(s.name)} in ${escAttr(monthLabel(mk))}">
           <option value=""${mine?'':' selected'}>— no team —</option>
           ${allTeams.map(x => {
             const isMine = x.code === mine;
-            const held = isMine ? null : staffOfTeam(x.code);
-            let c = isMine ? null : staffMonthConflict(s.id, x.code);
-            // The team they currently hold is the seat they would vacate by
-            // moving, not a clash — only a team already given up this month is.
-            if (c && c.open && c.group === mine) c = null;
+            const held = isMine ? null : staffOfTeam(x.code, mk);
             return `<option value="${escAttr(x.code)}"${isMine?' selected':''}>${
-              escHtml(`${x.name} (${x.members.length})`
-                + (held ? ` — with ${held.name}` : '')
-                + (c ? ` · had ${c.name} this month` : ''))}</option>`;
+              escHtml(`${x.name} (${x.members.length})` + (held ? ` — with ${held.name}` : ''))}</option>`;
           }).join('')}
-        </select>` +
-        (openA ? `<div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);margin-top:3px;">since ${escHtml(fmtCreated(new Date(openA.from)))}</div>` : '');
+        </select>`;
       return `<tr>
         <td><strong>${escHtml(s.name)}</strong></td>
         <td style="font-family:'Space Mono',monospace;font-size:12px;">${
@@ -9383,44 +9506,7 @@ function renderStaff(){
   renderUnassignedTeams(allTeams);
 }
 
-// The hand-over log. This is the part a single "current team" field would have
-// destroyed, and the part the year-end question actually needs.
-function renderAssignmentHistory(){
-  const closed = staffAssignments.filter(a => a.to)
-    .sort((a,b) => String(b.to).localeCompare(String(a.to)));
-  if (!closed.length) return '';
-  const names = Object.fromEntries(staffList.map(s => [String(s.id), s.name]));
-  const byCode = Object.fromEntries(buildTeams().map(t => [t.code, t.name]));
-  const fmt = iso => iso ? fmtCreated(new Date(iso)) : 'now';
-  return `<div class="d-section" style="margin-top:18px;">
-    <div class="d-head">🕘 HAND-OVER HISTORY (${closed.length})</div>
-    <div style="padding:10px 14px;font-family:'Space Mono',monospace;font-size:11px;line-height:2.1;">` +
-    closed.slice(0, 40).map(a => `<div>
-      <strong>${escHtml(names[String(a.staffId)] || 'removed staff')}</strong>
-      handled <strong>${escHtml(byCode[a.group] || a.group)}</strong>
-      <span style="color:var(--muted);">${escHtml(fmt(a.from))} → ${escHtml(fmt(a.to))}</span></div>`).join('') +
-    (closed.length > 40 ? `<div style="color:var(--muted);">…and ${closed.length - 40} older. All of them are in the year-end PDF.</div>` : '') +
-    '</div></div>';
-}
 
-function renderUnassignedTeams(allTeams){
-  const box  = document.getElementById('staff-unassigned');
-  const free = allTeams.filter(t => !staffOfTeam(t.code));
-  if (!free.length || !staffList.length){ box.innerHTML = ''; return; }
-  box.innerHTML = `<div class="d-section"><div class="d-head">⚠ TEAMS WITH NO STAFF (${free.length})</div>
-    <div style="padding:14px;display:flex;gap:10px;flex-wrap:wrap;">` +
-    free.map(t => `<div style="border:var(--b2);background:var(--surface);padding:8px 10px;">
-      <div style="font-weight:700;font-size:13px;margin-bottom:5px;">${escHtml(t.name)}
-        <span style="color:var(--muted);font-weight:400;">· ${t.members.length}</span></div>
-      <select class="nb-select nb-sm" onchange="assignTeamTo('${escAttr(t.code)}', this.value)" aria-label="Assign staff to ${escAttr(t.name)}">
-        <option value="">— assign staff —</option>
-        ${staffList.map(s => {
-          const c = staffMonthConflict(s.id, t.code);
-          return `<option value="${escAttr(s.id)}">${
-            escHtml(s.name + (c ? ` — has ${c.name} this month` : ''))}</option>`;
-        }).join('')}
-      </select></div>`).join('') + '</div></div>';
-}
 
 // ── PDFs ─────────────────────────────────────────────────────────
 // All three go through the print shell the team sheets use; the browser's
@@ -9538,42 +9624,31 @@ function printMonthlyReport(){
 
 // The year-end answer: which teams each staff member handled that year, for
 // how long, and how many people came in while they held each one.
+// The year-end answer: which teams each staff member handled that year, in
+// which months, and how many came in while they had it.
 function printYearReport(){
   const year = document.getElementById('staff-year').value || String(new Date().getFullYear());
-  const from = `${year}-01-01T00:00:00.000Z`;
-  const to   = `${year}-12-31T23:59:59.999Z`;
-  const live = assignmentsInRange(from, to);
-  if (!live.length){ toast(`NO ASSIGNMENTS IN ${year}`,'err'); return; }
+  const mine = staffAssignments.filter(a => a.month && a.month.slice(0,4) === year);
+  if (!mine.length){ toast(`NO ASSIGNMENTS IN ${year}`,'err'); return; }
 
   const byCode = Object.fromEntries(buildTeams().map(t => [t.code, t]));
   const names  = Object.fromEntries(staffList.map(s => [String(s.id), s]));
   const dated  = !!createdCol;
-  const fmt = iso => iso ? fmtCreated(new Date(iso)) : '—';
+  const ids = [...new Set(mine.map(a => String(a.staffId)))];
 
-  const ids = [...new Set(live.map(a => String(a.staffId)))];
   const sections = ids.map(id => {
     const s = names[id] || { name: 'Removed staff', role: '', mobile: '' };
-    const mine = live.filter(a => String(a.staffId) === id);
-    const groups = [...new Set(mine.map(a => a.group))];
+    const rowsFor = mine.filter(a => String(a.staffId) === id).sort((a,b) => a.month.localeCompare(b.month));
+    const groups = [...new Set(rowsFor.map(a => a.group))];
     let joined = 0;
-    const rows = mine.map(a => {
+    const body = rowsFor.map(a => {
       const t = byCode[a.group];
-      // An assignment starts the day it is recorded here, which is long after
-      // the team's existing members joined. For the team's FIRST holder there
-      // is no earlier claim on those people, so their window opens with the
-      // year; a later holder's window still opens at the hand-over.
-      const firstForGroup = staffAssignments
-        .filter(x => x.group === a.group)
-        .sort((x,y) => String(x.from).localeCompare(String(y.from)))[0];
-      const isFirst = firstForGroup && firstForGroup.id === a.id;
-      const start = (isFirst || a.from < from) ? from : a.from;
-      const end   = (a.to && a.to < to) ? a.to : to;
-      const n = (dated && t) ? countInWindow(t.members, start, end) : 0;
+      const n = (dated && t) ? countInMonth(t.members, a.month) : 0;
       joined += n;
       return `<tr>
+        <td style="padding:7px;font-weight:700;">${escHtml(monthLabel(a.month))}</td>
         <td style="padding:7px;"><strong>${escHtml(t ? t.name : a.group)}</strong></td>
         <td style="padding:7px;font-family:monospace;font-size:11px;">${escHtml(t ? t.range : '—')}</td>
-        <td style="padding:7px;font-size:11px;">${escHtml(fmt(a.from))} → ${escHtml(a.to ? fmt(a.to) : 'still holding')}</td>
         <td style="padding:7px;">${t?.leader ? escHtml(fullName(t.leader)) : '—'}${
           t?.leader?.mobileNo ? `<div style="font-family:monospace;font-size:10px;color:#777;">${escHtml(t.leader.mobileNo)}</div>` : ''}</td>
         <td style="padding:7px;text-align:right;font-weight:700;">${t ? t.members.length : '—'}</td>
@@ -9583,22 +9658,24 @@ function printYearReport(){
         margin:20px 0 4px;border-bottom:3px solid #000;padding-bottom:4px;">
         ${escHtml(s.name.toUpperCase())}
         <span style="font-family:'DM Sans',sans-serif;font-size:12px;letter-spacing:0;font-weight:400;">
-          — ${groups.length} TEAM${groups.length===1?'':'S'} IN ${escHtml(year)}${
-          dated ? ` · ${joined} REGISTERED WHILE HOLDING` : ''}</span></h2>
+          — ${groups.length} TEAM${groups.length===1?'':'S'} OVER ${rowsFor.length} MONTH${rowsFor.length===1?'':'S'} IN ${escHtml(year)}${
+          dated ? ` · ${joined} REGISTERED` : ''}</span></h2>
       <div style="font-size:11px;color:#555;margin-bottom:8px;">${escHtml(s.role||'Coordinator')}${
         s.mobile ? ' · ' + escHtml(s.mobile) : ''}</div>
-      <table><thead><tr><th>TEAM</th><th>CODES</th><th>HELD</th><th>TEAM LEADER</th>
+      <table><thead><tr><th>MONTH</th><th>TEAM</th><th>CODES</th><th>TEAM LEADER</th>
         <th style="text-align:right">MEMBERS NOW</th>
-        <th style="text-align:right">JOINED WHILE HELD</th></tr></thead><tbody>${rows}</tbody></table>`;
+        <th style="text-align:right">JOINED THAT MONTH</th></tr></thead><tbody>${body}</tbody></table>`;
   }).join('');
 
   const summary = ids.map((id, i) => {
     const s = names[id] || { name:'Removed staff' };
-    const groups = [...new Set(live.filter(a => String(a.staffId) === id).map(a => a.group))];
+    const rowsFor = mine.filter(a => String(a.staffId) === id);
+    const groups = [...new Set(rowsFor.map(a => a.group))];
     return `<tr style="background:${i%2?'#fafaf5':'#fff'}">
       <td style="padding:7px;text-align:center;color:#888;font-size:11px;">${i+1}</td>
       <td style="padding:7px;"><strong>${escHtml(s.name)}</strong></td>
       <td style="padding:7px;text-align:right;font-weight:700;">${groups.length}</td>
+      <td style="padding:7px;text-align:right;">${rowsFor.length}</td>
       <td style="padding:7px;">${escHtml(groups.map(g => byCode[g]?.name || g).join(', '))}</td></tr>`;
   }).join('');
 
@@ -9606,133 +9683,18 @@ function printYearReport(){
     <div class="hd"><div><h1>YEAR END ${escHtml(year)}</h1>
       <div class="sb">TEAMS HANDLED BY EACH STAFF MEMBER</div></div>
       <div class="mt">${ids.length} STAFF<br>${escHtml(new Date().toLocaleString('en-IN'))}</div></div>
-    <table><thead><tr><th>#</th><th>STAFF</th><th style="text-align:right">TEAMS HANDLED</th>
-      <th>WHICH TEAMS</th></tr></thead><tbody>${summary}</tbody></table>
+    <table><thead><tr><th>#</th><th>STAFF</th><th style="text-align:right">TEAMS</th>
+      <th style="text-align:right">MONTHS</th><th>WHICH TEAMS</th></tr></thead><tbody>${summary}</tbody></table>
     ${sections}
     <p style="margin-top:14px;font-size:10px;color:#777;">
-      Built from the hand-over history, so a team that changed hands during ${escHtml(year)}
-      appears under both staff members with the dates each of them held it.
-      "Joined while held" counts registrations inside that window; for a team's first
-      holder the window opens with the year, since nobody else had claim on its members.</p>`);
+      Each row is one month's booking. A team that changed hands during ${escHtml(year)}
+      appears under every staff member who had it, in the months they had it.</p>`);
   toast(`YEAR-END ${year} READY — ${ids.length} STAFF`,'ok');
 }
 
-// ── monthly rotation ─────────────────────────────────────────────
-// Teams change hands every month, so doing it one dropdown at a time is the
-// wrong shape. This sets the whole board at once: one close, one open, one
-// save, and the history keeps every month that came before.
-function openRotation(){
-  if (!staffList.length){ toast('ADD STAFF FIRST','err'); return; }
-  const teams = buildTeams().filter(t => t.real);
-  if (!teams.length){ toast('NO TEAMS IN THE REGISTRY YET','err'); return; }
-
-  document.getElementById('rotate-rows').innerHTML = staffList.map(s => {
-    const now = currentTeamsOf(s.id)[0] || '';
-    const held = teams.find(t => t.code === now);
-    return `<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:2px solid var(--line);">
-      <div style="flex:1 1 150px;">
-        <strong>${escHtml(s.name)}</strong>
-        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">
-          ${escHtml(s.role || 'Coordinator')}${held ? ' · now: ' + escHtml(held.name) : ' · no team'}</div>
-      </div>
-      <select class="nb-select nb-sm" data-staff="${escAttr(s.id)}" style="flex:0 1 210px;"
-              onchange="checkRotationClashes()" aria-label="New team for ${escAttr(s.name)}">
-        <option value="">— none this month —</option>
-        ${teams.map(t => {
-          let c = t.code === now ? null : staffMonthConflict(s.id, t.code);
-          // The seat they are about to vacate is not a reason to warn.
-          if (c && c.open && c.group === now) c = null;
-          return `<option value="${escAttr(t.code)}"${t.code===now?' selected':''}>${
-            escHtml(`${t.name} (${t.members.length})` + (c ? ` — had ${c.name} this month` : ''))}</option>`;
-        }).join('')}
-      </select></div>`;
-  }).join('');
-  checkRotationClashes();
-  openOverlay('rotate-overlay');
-}
 function closeRotation(){ closeOverlay('rotate-overlay'); }
 
-// Two people cannot hold the same team, and finding that out after the fact
-// would mean unpicking a month of history.
-function checkRotationClashes(){
-  const picks = [...document.querySelectorAll('#rotate-rows select')];
-  const seen = {}, dupes = new Set();
-  picks.forEach(p => {
-    if (!p.value) return;
-    if (seen[p.value]) dupes.add(p.value); else seen[p.value] = true;
-  });
-  picks.forEach(p => p.style.borderColor = dupes.has(p.value) ? 'var(--red)' : '');
-  const warn = document.getElementById('rotate-warn');
-  const btn  = document.getElementById('rotate-btn');
-  if (dupes.size){
-    warn.style.color = 'var(--red)';
-    warn.textContent = `⚠ ${[...dupes].join(', ').toUpperCase()} PICKED TWICE — ONE TEAM, ONE STAFF MEMBER`;
-    btn.disabled = true;
-  } else {
-    const changing = picks.filter(p => (currentTeamsOf(p.dataset.staff)[0] || '') !== p.value).length;
-    warn.style.color = 'var(--muted)';
-    warn.textContent = changing ? `${changing} CHANGE${changing===1?'':'S'} READY` : 'NOTHING CHANGED YET';
-    btn.disabled = !changing;
-  }
-}
 
-async function applyRotation(){
-  const picks = [...document.querySelectorAll('#rotate-rows select')]
-    .map(p => ({ staffId: p.dataset.staff, group: p.value }))
-    .filter(p => (currentTeamsOf(p.staffId)[0] || '') !== p.group);
-  if (!picks.length){ toast('NOTHING TO CHANGE','inf'); return; }
-
-  // Rotating inside a month would hand somebody a second team for it. The
-  // rotation is a month-boundary action; doing it mid-month needs saying so.
-  const moving = picks.filter(p => p.group);
-  const sameMonth = moving.filter(p => {
-    const c = staffMonthConflict(p.staffId, p.group);
-    if (!c) return false;
-    // The team they are handing over in this same rotation is not a clash with
-    // itself — without this every ordinary rotation would raise the warning.
-    if (c.open && currentTeamsOf(p.staffId).includes(c.group)) return false;
-    return true;
-  });
-  if (sameMonth.length){
-    const names = sameMonth.map(p => {
-      const c = staffMonthConflict(p.staffId, p.group);
-      return `${staffById(p.staffId)?.name || '?'} already has ${c.name}`;
-    }).join('\n');
-    if (!confirm(`This rotation gives someone a second team inside ${monthLabel(thisMonthKey())}:\n\n${names}\n\nA month should be one team per person. Apply anyway?`)) return;
-  }
-
-  // Swapping seats part-way through a month still leaves each mover holding
-  // two teams for it — the one handed over and the one taken. The rotation is
-  // meant for a month boundary, so say so once rather than per person.
-  const today = new Date();
-  const swapping = picks.filter(p => p.group && currentTeamsOf(p.staffId).length);
-  if (today.getDate() !== 1 && swapping.length){
-    const who = swapping.map(p => staffById(p.staffId)?.name || '?').join(', ');
-    if (!confirm(
-      `Today is the ${today.getDate()}${['th','st','nd','rd'][(today.getDate()%10>3||[11,12,13].includes(today.getDate()))?0:today.getDate()%10]} of ${monthLabel(thisMonthKey())}, not the 1st.\n\n` +
-      `${who} will have held two teams in ${monthLabel(thisMonthKey())} — the one being handed over and the new one.\n\n` +
-      `If this rotation is for next month, apply it on the 1st instead. Apply now anyway?`)) return;
-  }
-
-  const now = new Date().toISOString();
-  // Close every seat that is moving before opening any, or a team handed from
-  // one person to another would briefly look held by both.
-  picks.forEach(p => {
-    staffAssignments.forEach(a => {
-      if (!a.to && (String(a.staffId) === String(p.staffId) || a.group === p.group)) a.to = now;
-    });
-  });
-  picks.forEach(p => {
-    if (p.group) staffAssignments.push({ id: newAssignmentId(), staffId: p.staffId, group: p.group, from: now, to: null });
-  });
-
-  await idbSet('staffSavedAt', now);
-  await persistStaff();
-  closeRotation();
-  renderStaff();
-  if (document.getElementById('pg-teams').classList.contains('active')) renderTeams();
-  toast(`ROTATION APPLIED — ${picks.length} CHANGE${picks.length===1?'':'S'}`,'ok');
-}
 
 // ── backup ───────────────────────────────────────────────────────
 async function exportStaffBackup(){
@@ -9762,9 +9724,9 @@ async function importStaffBackup(ev){
     if (d.kind !== 'sevak-registry-settings') throw new Error('Not a settings backup');
     if (!confirm(`Restore ${(d.staffList||[]).length} staff and their assignment history?\n\nThis replaces the staff list, team names and leaders on THIS device. Registrations are untouched.`)) return;
     staffList        = d.staffList || [];
-    staffAssignments = d.staffAssignments
+    staffAssignments = migrateAssignments(d.staffAssignments
       || Object.entries(d.staffTeams || {}).map(([group, staffId]) => ({
-           id: newAssignmentId(), staffId, group, from: d.savedAt || new Date().toISOString(), to: null }));
+           id: newAssignmentId(), staffId, group, from: d.savedAt || new Date().toISOString(), to: null })));
     if (d.teamNames)    { teamNames    = d.teamNames;    await idbSet('teamNames', teamNames); }
     if (d.teamLeaders)  { teamLeaders  = d.teamLeaders;  await idbSet('teamLeaders', teamLeaders); }
     if (d.teamWhatsapp) { teamWhatsapp = d.teamWhatsapp; await idbSet('teamWhatsapp', teamWhatsapp); }
@@ -10260,23 +10222,49 @@ async function fastClear(){
 // team with a coordinator and nobody registered is the thing worth seeing,
 // and a stack of charts was never going to show it.
 
+// Everything with data or a plan, plus the next twelve months — a month you
+// cannot select is a month you cannot plan, which was the whole problem.
 function monthOptions(){
   const set = new Set([thisMonthKey()]);
   allRecords.forEach(r => { const k = monthOf(r); if (k) set.add(k); });
-  staffAssignments.forEach(a => {
-    if (a.from) set.add(a.from.slice(0,7));
-    if (a.to)   set.add(a.to.slice(0,7));
-  });
+  staffAssignments.forEach(a => { if (a.month) set.add(a.month); });
+  const d = new Date();
+  for (let i = 1; i <= 12; i++){
+    d.setMonth(d.getMonth() + 1);
+    set.add(monthKey(d));
+  }
   return [...set].sort().reverse();
+}
+
+// Step through them in calendar order. The list runs newest first, so forward
+// in time is one step up it.
+function shiftMonth(key, dir){
+  const [y, m] = key.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + dir, 1));
+  return monthKey(d);
+}
+function staffMonthStep(dir){
+  staffMonth = shiftMonth(staffMonthKey(), dir);
+  renderStaff();
+}
+async function copyPrevMonthPlan(){
+  const k = staffMonthKey();
+  await copyMonthPlan(shiftMonth(k, -1), k);
 }
 
 function monthStep(dir){
   const sel = document.getElementById('month-pick');
-  const opts = [...sel.options].map(o => o.value);
-  const i = opts.indexOf(sel.value);
-  // The list runs newest first, so "next month" is one step up it.
-  const next = i - dir;
-  if (next >= 0 && next < opts.length){ sel.value = opts[next]; renderMonth(); }
+  const want = shiftMonth(sel.value || thisMonthKey(), dir);
+  if (![...sel.options].some(o => o.value === want)){
+    // A month with neither records nor a plan is still worth opening — that
+    // is where a plan gets made.
+    const o = document.createElement('option');
+    o.value = want; o.textContent = monthLabel(want);
+    sel.appendChild(o);
+    [...sel.options].sort((a,b) => b.value.localeCompare(a.value)).forEach(x => sel.appendChild(x));
+  }
+  sel.value = want;
+  renderMonth();
 }
 
 // The window a month occupies, as the ISO strings the assignment rows use.
@@ -10311,8 +10299,8 @@ function renderMonth(){
   //    over mid-month shows both the people who held it.
   // Only the month in progress can be edited here. Rewriting who booked a team
   // in a month that has closed would quietly rewrite a report already sent.
-  const editable = key === thisMonthKey();
-  const booked = assignmentsInRange(from, to).map(a => ({
+  const editable = key >= thisMonthKey();
+  const booked = assignmentsFor(key).map(a => ({
     a, staff: staffById(a.staffId), team: byCode[a.group]
   })).filter(x => x.team);
 
@@ -10343,35 +10331,34 @@ function renderMonth(){
     // Count inside this holder's own window, not the team's month total —
     // a team handed over mid-month would otherwise credit both people with
     // everyone, and the column would not add up to the month.
-    const winFrom = x.a.from > from ? x.a.from : from;
-    const winTo   = (x.a.to && x.a.to < to) ? x.a.to : to;
-    const got = dated ? countInWindow(x.team.members, winFrom, winTo) : 0;
+    const got = dated ? countInMonth(x.team.members, key) : 0;
     const L = x.team.leader;
     return `<tr>
       <td><strong>${escHtml(x.team.name)}</strong>
         <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">${escHtml(x.team.range)}</div></td>
       <td>${editable
-        ? `<select class="cell-sel" onchange="setTeamStaff('${escAttr(x.team.code)}', this.value)"
-                   aria-label="Who books ${escAttr(x.team.name)}">
+        ? `<select class="cell-sel" onchange="setTeamStaff('${escAttr(x.team.code)}', this.value, '${key}')"
+                   aria-label="Who books ${escAttr(x.team.name)} in ${escAttr(monthLabel(key))}">
              <option value="">— nobody —</option>
              ${staffList.map(st => {
                const isMine = String(st.id) === String(x.a.staffId);
-               let c = isMine ? null : staffMonthConflict(st.id, x.team.code);
-               if (c && c.open && c.group === (currentTeamsOf(st.id)[0] || '')) c = null;
+               const busy = isMine ? '' : teamOfStaff(st.id, key);
                return `<option value="${escAttr(st.id)}"${isMine?' selected':''}>${
-                 escHtml(st.name + (c ? ` — has ${c.name}` : ''))}</option>`;
+                 escHtml(st.name + (busy ? ` — on ${busy}` : ''))}</option>`;
              }).join('')}
            </select>`
         : (x.staff ? escHtml(x.staff.name) : '<span style="color:var(--muted)">— removed —</span>')}
         ${x.staff?.mobile ? `<div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">${escHtml(x.staff.mobile)}</div>` : ''}</td>
       <td>${L ? escHtml(fullName(L)) : '—'}
         ${L?.mobileNo ? `<div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">${escHtml(L.mobileNo)}</div>` : ''}</td>
-      <td style="font-size:11px;">${escHtml(fmt(x.a.from))} → ${escHtml(x.a.to ? fmt(x.a.to) : 'still holding')}</td>
+      <td style="font-size:11px;">${escHtml(monthLabel(key))}</td>
       <td style="text-align:right;font-weight:700;">${x.team.members.length}</td>
       <td style="text-align:right;font-weight:700;color:${got ? 'var(--green)' : 'var(--muted)'};">${dated ? got : '—'}</td>
     </tr>`;
   }).join('') : `<tr><td colspan="6" style="padding:16px;color:var(--muted);">
-      No team was assigned to anyone this month. Assign one on the STAFF tab.</td></tr>`;
+      Nothing planned for ${escHtml(monthLabel(key))} yet.
+      ${editable ? `<button class="nb nb-yellow nb-sm" style="margin-left:8px;" onclick="staffMonth='${key}';switchTab('staff');openRotation();">PLAN ${escHtml(monthLabel(key).toUpperCase())}</button>` : ''}
+      </td></tr>`;
 
   // ── panel 2 — teams entered
   const enteredRows = Object.entries(enteredBy)
@@ -10424,9 +10411,10 @@ function renderMonth(){
 
   body.innerHTML =
     panel('📖 TEAMS TO BOOK IN ' + monthLabel(key).toUpperCase(),
-      `${bookedCodes.size} team${bookedCodes.size===1?'':'s'}` + (editable ? ' · editable' : ' · past month, read only'),
+      `${bookedCodes.size} team${bookedCodes.size===1?'':'s'}`
+        + (key > thisMonthKey() ? ' · planning ahead' : editable ? ' · editable' : ' · past month, read only'),
       `<div class="table-scroll"><table><thead><tr>
-         <th>TEAM</th><th>BOOKED BY</th><th>TEAM LEADER</th><th>HELD</th>
+         <th>TEAM</th><th>BOOKED BY</th><th>TEAM LEADER</th><th>MONTH</th>
          <th style="text-align:right">MEMBERS</th><th style="text-align:right">IN THIS MONTH</th>
        </tr></thead><tbody>${bookedRows}</tbody></table></div>`) +
 
