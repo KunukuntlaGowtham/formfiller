@@ -1865,6 +1865,28 @@ td { border: none; }
 .fast-pin-flag.bad  { color: var(--red); }
 .fast-pin-flag.busy { color: var(--muted-2); }
 
+
+/* ── what the team already holds ───────────────────────────────── */
+.fast-note {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px; margin-bottom: 12px;
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--tint-blue); font-size: 13px;
+  backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+}
+.fast-note.new { background: var(--tint-green); }
+.fast-note-sub {
+  font-family: 'Space Mono', monospace; font-size: 10.5px; color: var(--muted);
+  flex: 1 1 200px; min-width: 0;
+}
+.fast-existing .fast-in { background: rgba(91,124,245,.07); }
+.fast-existing[data-dirty="1"] .fast-in { background: rgba(242,194,48,.14); }
+.fast-tag {
+  font-family: 'Space Mono', monospace; font-size: 9px; font-weight: 700;
+  letter-spacing: 1px; color: var(--blue);
+}
+.fast-existing[data-dirty="1"] .fast-tag::after { content: ' · EDITED'; color: var(--orange); }
+
 </style>
 </head>
 <body>
@@ -2364,7 +2386,7 @@ td { border: none; }
       <div style="padding:12px 14px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
         <div class="fld" style="flex:0 1 120px;">
           <label for="fast-group">Team / code <span class="req">*</span></label>
-          <input id="fast-group" placeholder="DD" oninput="fastRenumber()" />
+          <input id="fast-group" placeholder="DD" oninput="fastRenumber();fastTeamNote()" />
         </div>
         <div class="fld" style="flex:0 1 100px;">
           <label for="fast-start">Start at</label>
@@ -2392,6 +2414,8 @@ td { border: none; }
         </div>
       </div>
     </div>
+
+    <div id="fast-team-note"></div>
 
     <div class="table-card">
       <div class="table-scroll">
@@ -3305,7 +3329,9 @@ async function connect() {
     if (typeof staffAfterConnect === 'function') staffAfterConnect();
     // A sheet opened before the records landed numbered itself against an
     // empty registry; now that they are here, number it again.
-    if (typeof fastRenumber === 'function' && document.querySelector('#fast-body tr')) fastRenumber();
+    if (typeof fastRenumber === 'function' && document.querySelector('#fast-body tr')){
+      fastRenumber(); fastTeamNote();
+    }
   } catch(e) {
     st.textContent='✗ failed'; st.style.color='#E63030';
     toast('CONNECT FAILED: '+e.message,'err');
@@ -9805,6 +9831,7 @@ function fastEnter(){
   if (g && !g.value) g.value = mostCommonGroup();
   fastStateList();
   fastRenumber();
+  fastTeamNote();
 }
 
 // ── rows ─────────────────────────────────────────────────────────
@@ -9858,6 +9885,8 @@ function addFastRow(prefill){
     el.addEventListener('paste', fastPaste);
     el.addEventListener('input', () => {
       markDirty(); scheduleFastDraft();
+      const tr = document.querySelector(`#fast-body tr[data-row="${row}"]`);
+      if (tr?.dataset.existing) tr.dataset.dirty = '1';
       if (f === 'pincode') fastPinSchedule(row);
     });
     el.addEventListener('blur', () => { fastNormalise(row, f); fastValidate(); });
@@ -10055,9 +10084,19 @@ function fastRenumber(){
   let n;
   if (/^\d+$/.test(startRaw)) n = parseInt(startRaw, 10);
   else {
-    const next = computeNextCode(group);
-    const p = next ? parseSeq(next) : null;
-    n = p ? p.num : 1;
+    // The highest number already spoken for in this group, plus one.
+    // Deliberately not computeNextCode: that counts the grid's own automatic
+    // numbers as taken, so switching the team away and back ratcheted the
+    // run upwards every time — AA13 became AA21 became AA29.
+    const gkey = codeGroup(/\d$/.test(group) ? group : group + '1').toLowerCase();
+    let max = 0;
+    taken.forEach(c => {
+      const p = parseSeq(c);
+      if (!p) return;
+      if (codeGroup(p.prefix + p.num).toLowerCase() !== gkey) return;
+      if (p.num > max) max = p.num;
+    });
+    n = max + 1;
   }
   rows.forEach(r => {
     if (fastSaved(r)) return;
@@ -10083,15 +10122,21 @@ document.addEventListener('input', e => {
 function fastValidate(){
   const rows = fastRows();
   const seenId = {}, seenMob = {}, seenCode = {};
-  const dbIds   = new Set(allRecords.map(r => String(r.idNumber||'').replace(/\s/g,'')).filter(Boolean));
-  const dbMobs  = new Set(allRecords.map(r => String(r.mobileNo||'').replace(/\D/g,'')).filter(Boolean));
-  const dbCodes = new Set(allRecords.map(r => String(r.code||'').trim().toLowerCase()).filter(Boolean));
+  // A row opened from the registry would otherwise be flagged as a duplicate
+  // of itself, so each one's own record is left out of what it is compared to.
+  const openedIds = new Set(fastRows().map(fastExistingId).filter(Boolean));
+  const others = allRecords.filter(r => !openedIds.has(String(r.id)));
+  const dbIds   = new Set(others.map(r => String(r.idNumber||'').replace(/\s/g,'')).filter(Boolean));
+  const dbMobs  = new Set(others.map(r => String(r.mobileNo||'').replace(/\D/g,'')).filter(Boolean));
+  const dbCodes = new Set(others.map(r => String(r.code||'').trim().toLowerCase()).filter(Boolean));
   let ready = 0, filled = 0;
 
   rows.forEach(r => {
     const saved = fastSaved(r);
+    const tr = document.querySelector(`#fast-body tr[data-row="${r}"]`);
+    const untouched = tr?.dataset.existing && tr.dataset.dirty !== '1';
     const any = FAST_COLS.some(f => f !== 'code' && fastVal(r, f)) || !!fastPhotos[r];
-    if (any && !saved) filled++;
+    if (any && !saved && !untouched) filled++;
 
     FAST_COLS.forEach(f => {
       const el = fastEl(r, f);
@@ -10145,7 +10190,7 @@ function fastValidate(){
     }
 
     const codeOk  = !!fastVal(r,'code');
-    if (codeOk && FAST_REQ.every(f => fastVal(r, f))
+    if (!untouched && codeOk && FAST_REQ.every(f => fastVal(r, f))
         && !FAST_COLS.some(f => fastEl(r,f)?.classList.contains('fast-bad'))) ready++;
   });
 
@@ -10165,6 +10210,8 @@ async function fastSaveAll(){
 
   const todo = fastRows().filter(r => {
     if (fastSaved(r)) return false;
+    const tr = document.querySelector(`#fast-body tr[data-row="${r}"]`);
+    if (tr?.dataset.existing && tr.dataset.dirty !== '1') return false;   // opened, untouched
     if (!FAST_COLS.some(f => f !== 'code' && fastVal(r, f)) && !fastPhotos[r]) return false;
     return FAST_REQ.every(f => fastVal(r, f)) && fastVal(r,'code')
         && !FAST_COLS.some(f => fastEl(r,f)?.classList.contains('fast-bad'));
@@ -10195,14 +10242,27 @@ async function fastSaveAll(){
     const label = `${raw.code} ${raw.sevakName||''} ${raw.surName||''}`.trim();
     const tr = document.querySelector(`#fast-body tr[data-row="${r}"]`);
     try {
-      const res = await upsertByIdNumber(filterToColumns(raw));
+      // A row opened from the registry is patched by the id it came from, so
+      // a corrected ID number updates that person instead of creating a second.
+      const existingId = tr.dataset.existing;
+      let res;
+      if (existingId){
+        const updated = await supa(`${TABLE}?${pkEq(existingId)}`, {
+          method:'PATCH', body: JSON.stringify(filterToColumns(raw)) });
+        if (!Array.isArray(updated) || !updated.length) throw new Error('No row matched id ' + existingId);
+        res = { action:'updated', rows: updated };
+        const idx = allRecords.findIndex(x => String(x.id) === String(existingId));
+        if (idx >= 0) allRecords[idx] = updated[0];
+      } else {
+        res = await upsertByIdNumber(filterToColumns(raw));
+      }
       tr.dataset.saved = '1';
       tr.classList.add('fast-done');
       tr.querySelector('.fast-status').innerHTML = res.action === 'updated'
         ? '<span style="color:var(--blue);font-weight:700;">↻ UPDATED</span>'
         : '<span style="color:var(--green);font-weight:700;">✓ SAVED</span>';
       FAST_COLS.forEach(f => { const el = fastEl(r,f); if (el) el.readOnly = true; });
-      if (Array.isArray(res.rows) && res.rows[0]) fresh.push(res.rows[0]);
+      if (!existingId && Array.isArray(res.rows) && res.rows[0]) fresh.push(res.rows[0]);
       say(res.action === 'updated' ? '#1A56FF' : '#00C16A',
           `${res.action === 'updated' ? '↻' : '✓'} ${label}`);
       ok++;
@@ -10655,6 +10715,90 @@ async function fastCheckAllPins(){
   }
   btn.disabled = false; btn.textContent = '📮 CHECK PINCODES';
   toast(`${ok} OK${bad?` · ${bad} DISAGREE`:''}${miss?` · ${miss} NOT FOUND`:''}`, bad || miss ? 'inf' : 'ok');
+}
+
+// ── what the team already has ────────────────────────────────────
+// Typing into a team you cannot see is how a run of codes gets duplicated and
+// how the same person gets entered twice. The note says where the team stands;
+// opening it puts the existing members in the grid as ordinary rows, so a
+// wrong spelling or a missing mobile is fixed where you are already working
+// rather than on a different screen.
+
+function fastTeamNote(){
+  const box = document.getElementById('fast-team-note');
+  if (!box) return;
+  const group = (document.getElementById('fast-group')?.value || '').trim();
+  if (!group){ box.innerHTML = ''; return; }
+
+  const key = codeGroup(/\d$/.test(group) ? group : group + '1').toLowerCase();
+  const members = allRecords.filter(r => codeGroup(r.code).toLowerCase() === key);
+  if (!members.length){
+    box.innerHTML = `<div class="fast-note new">
+      <strong>${escHtml(group.toUpperCase())}</strong> is a new team — no records carry this code yet.</div>`;
+    return;
+  }
+  const nums = members.map(m => parseSeq(m.code)).filter(Boolean).map(p => p.num).sort((a,b) => a-b);
+  const gaps = [];
+  for (let i = 1; i < (nums[nums.length-1] || 0); i++) if (!nums.includes(i)) gaps.push(i);
+  const shown = fastRows().some(r => fastExistingId(r));
+
+  box.innerHTML = `<div class="fast-note">
+    <strong>${escHtml(buildTeams().find(t => t.code.toLowerCase() === key)?.name || group.toUpperCase())}</strong>
+    already has <strong>${members.length}</strong> member${members.length===1?'':'s'}
+    <span class="fast-note-sub">${escHtml(members[0]?.code || '')} – ${escHtml(members[members.length-1]?.code || '')}${
+      gaps.length ? ` · free in the middle: ${gaps.slice(0,8).map(g => group + g).join(', ')}${gaps.length>8?'…':''}` : ''}</span>
+    <button class="nb nb-ghost nb-sm" style="margin-left:auto;" onclick="${
+      shown ? 'fastHideTeam()' : 'fastLoadTeam()'}">${
+      shown ? 'HIDE THEM' : `OPEN ALL ${members.length}`}</button>
+  </div>`;
+}
+
+const fastExistingId = row =>
+  document.querySelector(`#fast-body tr[data-row="${row}"]`)?.dataset.existing || '';
+
+// Existing members come in as normal rows carrying the id of the record they
+// came from, which is what makes saving an update rather than a second copy.
+function fastLoadTeam(){
+  const group = (document.getElementById('fast-group')?.value || '').trim();
+  if (!group) return;
+  const key = codeGroup(/\d$/.test(group) ? group : group + '1').toLowerCase();
+  const members = allRecords.filter(r => codeGroup(r.code).toLowerCase() === key)
+    .sort(byCodeOrder);
+  if (!members.length) return;
+
+  fastHideTeam();
+  const body = document.getElementById('fast-body');
+  // Built in reverse so that inserting each at the top leaves them in code
+  // order, above the blank rows waiting to be typed into.
+  members.slice().reverse().forEach(m => {
+    const row = addFastRow(Object.fromEntries(FAST_COLS.map(f => [f, m[f] || ''])));
+    const tr = document.querySelector(`#fast-body tr[data-row="${row}"]`);
+    tr.dataset.existing = String(m.id);
+    tr.classList.add('fast-existing');
+    // These are saved records, not something being typed — no reason to ask
+    // India Post about every one of them on open. CHECK PINCODES still will.
+    clearTimeout(_fastPinT[row]);
+    tr.querySelector('.fast-status').innerHTML =
+      '<span class="fast-tag">IN REGISTRY</span>';
+    // Its code is its own; the numbering must not reach for it.
+    fastEl(row, 'code').dataset.manual = '1';
+    if (m.photoBase64){ fastPhotos[row] = photoSrc(m.photoBase64); fastPaintPhoto(row); }
+    body.insertBefore(tr, body.firstChild);
+  });
+  fastRenumber(); fastTeamNote();
+  toast(`${members.length} EXISTING MEMBER${members.length===1?'':'S'} OPENED — EDIT AND SAVE TO UPDATE`,'ok');
+}
+
+function fastHideTeam(){
+  fastRows().forEach(r => {
+    if (!fastExistingId(r)) return;
+    // Anything edited is worth keeping on screen rather than silently dropping.
+    const tr = document.querySelector(`#fast-body tr[data-row="${r}"]`);
+    if (tr.dataset.dirty === '1') return;
+    tr.remove();
+    delete fastPhotos[r];
+  });
+  fastRenumber(); fastTeamNote();
 }
 
 </script>
