@@ -1850,6 +1850,21 @@ td { border: none; }
 :root[data-theme="dark"] .cell-sel:hover { background: rgba(255,255,255,.08); }
 .cell-sel:focus { background: rgba(255,255,255,.8); border-color: var(--lav-500); outline: none; }
 
+
+/* ── pincode flag in the grid ──────────────────────────────────── */
+.fast-pin-wrap { display: flex; align-items: center; }
+.fast-pin-wrap .fast-in { flex: 1; min-width: 0; }
+.fast-pin-flag {
+  flex: 0 0 auto; width: 20px; height: 22px; padding: 0; margin-right: 4px;
+  border: none; background: transparent; cursor: default;
+  font-size: 11px; line-height: 22px; color: var(--muted-3);
+}
+.fast-pin-flag.ok   { color: var(--green); }
+.fast-pin-flag.warn { color: var(--orange); cursor: pointer; font-weight: 700; }
+.fast-pin-flag.warn:hover { transform: scale(1.25); }
+.fast-pin-flag.bad  { color: var(--red); }
+.fast-pin-flag.busy { color: var(--muted-2); }
+
 </style>
 </head>
 <body>
@@ -2334,6 +2349,8 @@ td { border: none; }
       <span id="fast-count" style="font-family:'Space Mono',monospace;font-size:11px;font-weight:700;letter-spacing:1px;"></span>
       <button class="nb nb-ghost" onclick="addFastRows(5)" title="Add five more rows">＋ 5 ROWS</button>
       <button class="nb nb-ghost" onclick="fastRenumber()" title="Re-number every code from the team and start number">🔢 RENUMBER</button>
+      <button class="nb nb-ghost" id="fast-pin-btn" onclick="fastCheckAllPins()"
+              title="Check every pincode against India Post and fill in the district and state">📮 CHECK PINCODES</button>
       <button class="nb nb-red"   onclick="fastClear()" title="Empty the grid">✕ CLEAR</button>
       <button class="nb nb-yellow" id="fast-save-btn" onclick="fastSaveAll()">⚡ SAVE ALL</button>
     </div>
@@ -3286,6 +3303,9 @@ async function connect() {
     showColumnStatus();          // must run AFTER the status text is set, or it gets wiped
     toast('CONNECTED TO SUPABASE','ok');
     if (typeof staffAfterConnect === 'function') staffAfterConnect();
+    // A sheet opened before the records landed numbered itself against an
+    // empty registry; now that they are here, number it again.
+    if (typeof fastRenumber === 'function' && document.querySelector('#fast-body tr')) fastRenumber();
   } catch(e) {
     st.textContent='✗ failed'; st.style.color='#E63030';
     toast('CONNECT FAILED: '+e.message,'err');
@@ -9812,7 +9832,12 @@ function addFastRow(prefill){
     cell('street',   'list="dl-street"') +
     cell('city',     'list="dl-city"') +
     cell('district', 'list="dl-district"') +
-    cell('pincode',  'maxlength="6" inputmode="numeric"') +
+    `<td><div class="fast-pin-wrap">
+       <input id="fast-${row}-pincode" data-row="${row}" data-f="pincode" class="fast-in"
+              maxlength="6" inputmode="numeric" />
+       <button type="button" class="fast-pin-flag" id="fast-${row}-pinflag"
+               onclick="fastPinApply(${row})" tabindex="-1"></button>
+     </div></td>` +
     cell('state',    'list="dl-fast-state"') +
     `<td class="fast-photo-cell">
        <input type="file" id="fast-${row}-photofile" accept="image/*" capture="environment"
@@ -9831,10 +9856,16 @@ function addFastRow(prefill){
     const el = fastEl(row, f);
     el.addEventListener('keydown', fastKeys);
     el.addEventListener('paste', fastPaste);
-    el.addEventListener('input', () => { markDirty(); scheduleFastDraft(); });
+    el.addEventListener('input', () => {
+      markDirty(); scheduleFastDraft();
+      if (f === 'pincode') fastPinSchedule(row);
+    });
     el.addEventListener('blur', () => { fastNormalise(row, f); fastValidate(); });
   });
-  if (prefill) FAST_COLS.forEach(f => { if (prefill[f]) fastEl(row, f).value = prefill[f]; });
+  if (prefill){
+    FAST_COLS.forEach(f => { if (prefill[f]) fastEl(row, f).value = prefill[f]; });
+    if (/^\d{6}$/.test(prefill.pincode || '')) fastPinSchedule(row);
+  }
   else FAST_DEFAULTS.forEach(f => {
     const v = (document.getElementById('fast-' + f)?.value || '').trim();
     if (v) fastEl(row, f).value = v;
@@ -10007,6 +10038,20 @@ function fastRenumber(){
   });
   if (!group) { fastValidate(); return; }
 
+  // Every code already spoken for: in the registry, on a row that has been
+  // saved, and on a row where it was typed by hand. Counting up from the
+  // highest is not enough — a gap in the middle, a hand-typed code, or a
+  // sheet opened before the records finished loading all hand out a number
+  // somebody already has.
+  const taken = new Set(allRecords.map(r => String(r.code||'').trim().toLowerCase()).filter(Boolean));
+  rows.forEach(r => {
+    const el = fastEl(r, 'code');
+    if (el && (fastSaved(r) || el.dataset.manual)){
+      const v = (el.value||'').trim().toLowerCase();
+      if (v) taken.add(v);
+    }
+  });
+
   let n;
   if (/^\d+$/.test(startRaw)) n = parseInt(startRaw, 10);
   else {
@@ -10017,7 +10062,11 @@ function fastRenumber(){
   rows.forEach(r => {
     if (fastSaved(r)) return;
     const el = fastEl(r, 'code');
-    if (el && !el.dataset.manual) el.value = group + n;
+    if (!el || el.dataset.manual) return;
+    let guard = 0;
+    while (taken.has((group + n).toLowerCase()) && guard++ < 10000) n++;
+    el.value = group + n;
+    taken.add((group + n).toLowerCase());
     n++;
   });
   fastValidate();
@@ -10033,9 +10082,10 @@ document.addEventListener('input', e => {
 // a sheet of twenty is exactly where a repeated mobile number hides.
 function fastValidate(){
   const rows = fastRows();
-  const seenId = {}, seenMob = {};
-  const dbIds  = new Set(allRecords.map(r => String(r.idNumber||'').replace(/\s/g,'')).filter(Boolean));
-  const dbMobs = new Set(allRecords.map(r => String(r.mobileNo||'').replace(/\D/g,'')).filter(Boolean));
+  const seenId = {}, seenMob = {}, seenCode = {};
+  const dbIds   = new Set(allRecords.map(r => String(r.idNumber||'').replace(/\s/g,'')).filter(Boolean));
+  const dbMobs  = new Set(allRecords.map(r => String(r.mobileNo||'').replace(/\D/g,'')).filter(Boolean));
+  const dbCodes = new Set(allRecords.map(r => String(r.code||'').trim().toLowerCase()).filter(Boolean));
   let ready = 0, filled = 0;
 
   rows.forEach(r => {
@@ -10053,6 +10103,19 @@ function fastValidate(){
       if (any && FAST_REQ.includes(f) && !v){ el.classList.add('fast-warn'); el.title = 'Required'; }
     });
 
+    // A code is as unique as an ID here: two people on one code makes the
+    // team lists and the numbering disagree with each other from then on.
+    // Checked ahead of the "row has anything in it" test, because a clashing
+    // code typed into an empty row is exactly when it is worth saying so.
+    const code = fastVal(r,'code').trim();
+    if (code && !saved){
+      const el = fastEl(r,'code');
+      const low = code.toLowerCase();
+      if (seenCode[low]){ el.classList.add('fast-bad'); el.title = `Same code as row ${seenCode[low]}`; }
+      else if (dbCodes.has(low)){ el.classList.add('fast-bad'); el.title = 'This code is already in the registry'; }
+      seenCode[low] = seenCode[low] || (rows.indexOf(r) + 1);
+    }
+
     if (!any || saved) return;
 
     const id = fastVal(r,'idNumber').replace(/\s/g,'');
@@ -10065,6 +10128,13 @@ function fastValidate(){
       }
       seenId[id] = seenId[id] || (rows.indexOf(r) + 1);
     }
+    const ps = fastPin[r];
+    if (ps && ps.state !== 'ok'){
+      const el = fastEl(r,'pincode');
+      if (ps.state === 'none'){ el.classList.add('fast-bad'); el.title = 'No such pincode'; }
+      else if (ps.state === 'mismatch'){ el.classList.add('fast-warn'); el.title = `India Post says ${ps.api.district}, ${ps.api.state}`; }
+    }
+
     const mob = fastVal(r,'mobileNo').replace(/\D/g,'');
     if (mob){
       const el = fastEl(r,'mobileNo');
@@ -10207,6 +10277,7 @@ async function fastClear(){
   document.getElementById('fast-body').innerHTML = '';
   document.getElementById('fast-log').innerHTML = '';
   Object.keys(fastPhotos).forEach(k => delete fastPhotos[k]);
+  Object.keys(fastPin).forEach(k => delete fastPin[k]);
   await idbSet('fastDraft', null);
   addFastRows(8);
   clearDirty();
@@ -10474,6 +10545,117 @@ function paintConnDot(){
 new MutationObserver(paintConnDot).observe(
   document.getElementById('conn-status'), { childList:true, characterData:true, subtree:true });
 paintConnDot();
+
+// ── pincode check, per row ───────────────────────────────────────
+// The register form verifies a pincode against India Post and offers to fix
+// the district and state. Typing a team off paper is exactly where that
+// matters more — twenty addresses go by in the time one form takes — but the
+// grid had no room for the form's verify bar. So the answer lives in the cell
+// itself: a flag you can read at a glance and click to apply.
+
+const fastPin = {};            // row -> { pin, state, api }
+const _fastPinT = {};
+
+function fastPinSchedule(row){
+  clearTimeout(_fastPinT[row]);
+  _fastPinT[row] = setTimeout(() => fastPinCheck(row), 500);
+}
+
+async function fastPinCheck(row, quiet){
+  const el = fastEl(row, 'pincode');
+  if (!el) return;
+  const pin = fastVal(row, 'pincode');
+  const flag = document.getElementById(`fast-${row}-pinflag`);
+  if (!/^\d{6}$/.test(pin)){
+    delete fastPin[row];
+    if (flag) flag.className = 'fast-pin-flag';
+    if (flag) flag.textContent = '';
+    return;
+  }
+  if (fastPin[row]?.pin === pin && fastPin[row].state !== 'err') { fastPinPaint(row); return; }
+
+  if (flag){ flag.className = 'fast-pin-flag busy'; flag.textContent = '⏳'; flag.title = 'Checking with India Post…'; }
+  try {
+    const api = await lookupPincode(pin);
+    if (!api){
+      fastPin[row] = { pin, state: 'none' };
+    } else {
+      const d = fastVal(row,'district'), st = fastVal(row,'state');
+      // An empty district or state is not a disagreement — it is a gap the
+      // pincode can fill, which is the whole point of checking it.
+      let filled = 0;
+      if (!d){ fastEl(row,'district').value = api.district; flash(fastEl(row,'district')); filled++; }
+      if (!st){ fastEl(row,'state').value = api.state; flash(fastEl(row,'state')); filled++; }
+      if (!fastVal(row,'city') && api.offices?.length === 1){
+        fastEl(row,'city').value = api.offices[0]; flash(fastEl(row,'city')); filled++;
+      }
+      const d2 = fastVal(row,'district'), s2 = fastVal(row,'state');
+      const bad = [];
+      if (d2 && d2.toLowerCase() !== api.district.toLowerCase()) bad.push('district');
+      if (s2 && s2.toLowerCase() !== api.state.toLowerCase())    bad.push('state');
+      fastPin[row] = { pin, state: bad.length ? 'mismatch' : 'ok', api, bad, filled };
+      if (filled) scheduleFastDraft();
+    }
+  } catch(e){
+    // Offline or blocked: say so rather than marking a good pincode wrong.
+    fastPin[row] = { pin, state: 'err', msg: e.message };
+  }
+  fastPinPaint(row);
+  fastValidate();
+}
+
+function fastPinPaint(row){
+  const flag = document.getElementById(`fast-${row}-pinflag`);
+  if (!flag) return;
+  const st = fastPin[row];
+  if (!st){ flag.className = 'fast-pin-flag'; flag.textContent = ''; flag.title = ''; return; }
+  if (st.state === 'ok'){
+    flag.className = 'fast-pin-flag ok';
+    flag.textContent = '✓';
+    flag.title = `${st.api.district}, ${st.api.state}` + (st.filled ? ' — filled in from the pincode' : '');
+  } else if (st.state === 'mismatch'){
+    flag.className = 'fast-pin-flag warn';
+    flag.textContent = '⚠';
+    flag.title = `India Post says ${st.api.district}, ${st.api.state} — click to use it`;
+  } else if (st.state === 'none'){
+    flag.className = 'fast-pin-flag bad';
+    flag.textContent = '✕';
+    flag.title = 'No such pincode — check the six digits';
+  } else {
+    flag.className = 'fast-pin-flag';
+    flag.textContent = '?';
+    flag.title = 'Could not reach India Post: ' + (st.msg || 'offline');
+  }
+}
+
+// Clicking a disagreeing flag takes India Post's answer.
+function fastPinApply(row){
+  const st = fastPin[row];
+  if (!st || st.state !== 'mismatch') return;
+  fastEl(row,'district').value = st.api.district; flash(fastEl(row,'district'));
+  fastEl(row,'state').value    = st.api.state;    flash(fastEl(row,'state'));
+  fastPin[row] = { ...st, state: 'ok', bad: [] };
+  fastPinPaint(row);
+  fastValidate(); scheduleFastDraft();
+  toast(`ROW ${fastRows().indexOf(row)+1} → ${st.api.district.toUpperCase()}, ${st.api.state.toUpperCase()}`,'ok');
+}
+
+// A whole sheet at once, which is how a typed-up team gets checked.
+async function fastCheckAllPins(){
+  const rows = fastRows().filter(r => !fastSaved(r) && /^\d{6}$/.test(fastVal(r,'pincode')));
+  if (!rows.length){ toast('NO SIX-DIGIT PINCODES TO CHECK','err'); return; }
+  const btn = document.getElementById('fast-pin-btn');
+  btn.disabled = true;
+  let ok = 0, bad = 0, miss = 0;
+  for (let i = 0; i < rows.length; i++){
+    btn.textContent = `⏳ ${i+1}/${rows.length}`;
+    await fastPinCheck(rows[i], true);
+    const st = fastPin[rows[i]]?.state;
+    if (st === 'ok') ok++; else if (st === 'mismatch') bad++; else miss++;
+  }
+  btn.disabled = false; btn.textContent = '📮 CHECK PINCODES';
+  toast(`${ok} OK${bad?` · ${bad} DISAGREE`:''}${miss?` · ${miss} NOT FOUND`:''}`, bad || miss ? 'inf' : 'ok');
+}
 
 </script>
 </body>
