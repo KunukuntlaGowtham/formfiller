@@ -2424,9 +2424,7 @@ td { border: none; }
             <th style="width:34px;">#</th>
             <th style="width:92px;">CODE</th>
             <th style="width:140px;">ID / AADHAAR <span class="req">*</span></th>
-            <th style="width:150px;">NAME <span class="req">*</span></th>
-            <th style="width:120px;">SURNAME</th>
-            <th style="width:150px;">FATHER / SPOUSE</th>
+            <th style="width:180px;">NAME <span class="req">*</span></th>
             <th style="width:110px;">DOB <span class="req">*</span></th>
             <th style="width:56px;" title="Type m, f or o">SEX <span class="req">*</span></th>
             <th style="width:120px;">MOBILE <span class="req">*</span></th>
@@ -9797,7 +9795,12 @@ loadStaff();
 // Values live in the inputs rather than in a parallel array. One copy means
 // the grid and the save can never disagree about what was typed.
 
-const FAST_COLS = ['code','idNumber','sevakName','surName','fatherOrSpouseName','dob','gender','mobileNo',
+// Surname and father/spouse are off the grid: they were two columns of
+// scrolling for fields that are not required and are quicker to add on the
+// record itself when they matter. Leaving them out of this list also keeps
+// them out of a PATCH, so opening a team and saving a correction does not
+// blank what is already stored in them.
+const FAST_COLS = ['code','idNumber','sevakName','dob','gender','mobileNo',
                    'doorNo','street','city','district','pincode','state'];
 const FAST_REQ  = ['idNumber','sevakName','dob','gender','mobileNo','state'];   // code comes from the numbering
 // What a new row inherits from the bar above it. These are a starting point,
@@ -9850,8 +9853,6 @@ function addFastRow(prefill){
     cell('code') +
     cell('idNumber', 'inputmode="numeric" maxlength="14"') +
     cell('sevakName') +
-    cell('surName') +
-    cell('fatherOrSpouseName') +
     cell('dob', 'placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric"') +
     cell('gender', 'maxlength="6" title="m, f or o" class="fast-in fast-sex"') +
     cell('mobileNo', 'type="tel" maxlength="10" inputmode="numeric"') +
@@ -9979,8 +9980,7 @@ function fastNormalise(row, f){
   if (f === 'dob')      el.value = normDob(v) || v;
   if (f === 'idNumber') el.value = v.replace(/\s+/g,'');
   if (f === 'mobileNo') el.value = v.replace(/\D/g,'').slice(-10);
-  if (f === 'sevakName' || f === 'surName' || f === 'fatherOrSpouseName')
-    el.value = toProperCase(cleanName(v));
+  if (f === 'sevakName') el.value = toProperCase(cleanName(v));
   if (f === 'pincode') el.value = v.replace(/\D/g,'').slice(0,6);
   if (f === 'state')   el.value = matchState(v) || tidyPlace(v);
   if (f === 'city' || f === 'district' || f === 'street') el.value = tidyPlace(v);
@@ -10239,7 +10239,7 @@ async function fastSaveAll(){
     if (fastPhotos[r]) raw.photoBase64 = fastPhotos[r];
     raw.dob = normDob(raw.dob);
     raw.gender = normGender(raw.gender);
-    const label = `${raw.code} ${raw.sevakName||''} ${raw.surName||''}`.trim();
+    const label = `${raw.code} ${raw.sevakName||''}`.trim();
     const tr = document.querySelector(`#fast-body tr[data-row="${r}"]`);
     try {
       // A row opened from the registry is patched by the id it came from, so
