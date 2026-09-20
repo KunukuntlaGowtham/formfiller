@@ -2003,6 +2003,7 @@ td { border: none; }
     <button class="nb nb-green nb-sm" onclick="exportExcel()" title="Export filtered list to Excel">📊 EXCEL</button>
     <button class="nb nb-red nb-sm" onclick="exportPDF()" title="Export filtered list to PDF roster">📄 PDF</button>
     <button class="nb nb-blue nb-sm" onclick="printIdCards()" title="Print ID cards for selected (or filtered) records">🪪 ID CARDS</button>
+    <button class="nb nb-purple nb-sm" onclick="openContacts()" title="Save to phone contacts as CODE + NAME">📇 CONTACTS</button>
     <button class="nb nb-ghost nb-sm" onclick="showNewestFirst()" title="Order by when each record was added (row id)">🆕 NEWEST</button>
     <button class="nb nb-black nb-sm" onclick="openCsvImport()" title="Import records from CSV or Excel">📥 IMPORT</button>
   </div>
@@ -2715,6 +2716,56 @@ td { border: none; }
     <div class="modal-footer">
       <button class="nb nb-ghost" onclick="closeDel()">CANCEL</button>
       <button class="nb nb-red" onclick="confirmDelete()">✕ YES, DELETE</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONTACTS EXPORT MODAL -->
+<div class="overlay" id="contacts-overlay">
+  <div class="modal" style="max-width:540px;" role="dialog" aria-modal="true" aria-label="Save to contacts">
+    <button class="btn-x" onclick="closeContacts()" title="Close" aria-label="Close">✕</button>
+    <div class="modal-title">📇 SAVE TO <span class="hi">CONTACTS</span></div>
+    <p style="font-size:13.5px;line-height:1.7;color:var(--muted);margin-bottom:16px;" id="ct-scope"></p>
+
+    <div class="fld"><label for="ct-pattern">Name shown when they call</label>
+    <select id="ct-pattern" onchange="ctPreview()">
+      <option value="code-name">AA1 Ramesh — code first (sorts by team)</option>
+      <option value="name-code">Ramesh (AA1) — name first</option>
+      <option value="code-only">AA1 — code only</option>
+    </select></div>
+
+    <div class="fld"><label for="ct-cc">Country code</label>
+    <input id="ct-cc" value="+91" placeholder="+91" oninput="ctPreview()" /></div>
+    <div style="font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.6;">
+      Added to any 10-digit mobile. Without it the phone often fails to match an
+      incoming call to the saved contact, which is the whole point of this export.
+    </div>
+
+    <div class="fld"><label for="ct-format">File</label>
+    <select id="ct-format" onchange="ctPreview()">
+      <option value="vcf">vCard (.vcf) — phone, and Google Contacts import</option>
+      <option value="csv">Google CSV (.csv) — contacts.google.com on a computer</option>
+    </select></div>
+
+    <label style="display:flex;align-items:center;gap:9px;margin-top:14px;font-size:13.5px;cursor:pointer;">
+      <input type="checkbox" id="ct-photos" onchange="ctPreview()" />
+      <span>Include photos <span style="color:var(--muted);font-size:11.5px;">(vCard only — makes the file much larger)</span></span>
+    </label>
+    <label style="display:flex;align-items:center;gap:9px;margin-top:8px;font-size:13.5px;cursor:pointer;">
+      <input type="checkbox" id="ct-team" checked onchange="ctPreview()" />
+      <span>Put the team in Company <span style="color:var(--muted);font-size:11.5px;">(lets Google group them)</span></span>
+    </label>
+    <label style="display:flex;align-items:center;gap:9px;margin-top:8px;font-size:13.5px;cursor:pointer;">
+      <input type="checkbox" id="ct-skipnophone" checked onchange="ctPreview()" />
+      <span>Skip anyone with no mobile number</span>
+    </label>
+
+    <div id="ct-preview" style="margin-top:16px;padding:12px 14px;border-radius:12px;
+         background:var(--surface-2);border:1px solid var(--line);font-size:13px;line-height:1.8;"></div>
+
+    <div class="modal-footer">
+      <button class="nb nb-ghost" onclick="closeContacts()">CANCEL</button>
+      <button class="nb nb-green" onclick="runContactsExport()" id="ct-go">⬇ DOWNLOAD</button>
     </div>
   </div>
 </div>
@@ -3931,6 +3982,7 @@ function closeOverlay(id){
 }
 document.getElementById('form-overlay').onclick=e=>{if(e.target===e.currentTarget)closeModal();};
 document.getElementById('del-overlay').onclick=e=>{if(e.target===e.currentTarget)closeDel();};
+document.getElementById('contacts-overlay').onclick=e=>{if(e.target===e.currentTarget)closeContacts();};
 
 document.addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
@@ -5284,6 +5336,208 @@ ${sharedStrings.map(s=>`<si><t xml:space="preserve">${esc(s)}</t></si>`).join(''
   a.href = url; a.download = `sevak-registry-${Date.now()}.xlsx`; a.click();
   setTimeout(()=>URL.revokeObjectURL(url), 2000);
   toast(`EXPORTED ${displayRecords.length} RECORDS TO EXCEL`, 'ok');
+}
+
+// ════════════════════════════════════════════
+// SAVE TO CONTACTS
+// ════════════════════════════════════════════
+// Every person is saved as "AA1 Ramesh", so an incoming call names the team
+// before it names the person. Two formats because they land in different
+// places: a .vcf opens straight into the phone's own contacts app, while
+// Google's CSV is what contacts.google.com accepts from a computer.
+
+// The records this export will write: the ticked ones if any are ticked,
+// otherwise everything currently filtered into view.
+function ctRecords(){
+  const picked = displayRecords.filter(r => selectedIds.has(String(r.id)));
+  return picked.length ? picked : displayRecords;
+}
+
+// A number a phone can match against an incoming call. Indian mobiles are
+// stored as ten digits; dialled and received they carry +91, and without it
+// the match silently fails — which would defeat the whole point.
+function ctPhone(raw, cc){
+  let d = String(raw == null ? '' : raw).replace(/[^\d+]/g, '');
+  if (!d) return '';
+  if (d.startsWith('+')) return d;
+  const code = String(cc || '').trim().replace(/[^\d+]/g, '');
+  d = d.replace(/^0+/, '');
+  if (!code) return d;
+  const bare = code.replace(/^\+/, '');
+  if (d.startsWith(bare) && d.length > 10) return '+' + d;   // already carries it
+  return (code.startsWith('+') ? code : '+' + code) + d;
+}
+
+function ctFullName(r, pattern){
+  const code = String(r.code || '').trim();
+  const name = [r.sevakName, r.surName].filter(Boolean).join(' ').trim();
+  if (pattern === 'code-only') return code || name || 'Unnamed';
+  if (pattern === 'name-code') return code ? (name || 'Unnamed') + ' (' + code + ')' : (name || 'Unnamed');
+  return [code, name].filter(Boolean).join(' ') || 'Unnamed';   // code-name
+}
+
+function ctAddress(r){
+  return [r.doorNo, r.street].filter(Boolean).join(' ').trim();
+}
+
+function ctOpts(){
+  return {
+    pattern: document.getElementById('ct-pattern').value,
+    cc:      document.getElementById('ct-cc').value,
+    format:  document.getElementById('ct-format').value,
+    photos:  document.getElementById('ct-photos').checked,
+    team:    document.getElementById('ct-team').checked,
+    skip:    document.getElementById('ct-skipnophone').checked
+  };
+}
+
+// ── vCard ────────────────────────────────────────────────────────────────
+// A vCard line may not exceed 75 octets; longer ones are folded onto a
+// continuation line that begins with a single space. Photos are thousands of
+// characters, so without folding the file imports as garbage.
+function vcFold(line){
+  if (line.length <= 73) return line;
+  let out = line.slice(0, 73), rest = line.slice(73);
+  while (rest.length > 72){ out += '\r\n ' + rest.slice(0, 72); rest = rest.slice(72); }
+  return out + (rest ? '\r\n ' + rest : '');
+}
+function vcEsc(v){
+  return String(v == null ? '' : v)
+    .replace(/\\/g, '\\\\').replace(/\n/g, '\\n')
+    .replace(/,/g, '\\,').replace(/;/g, '\;');
+}
+// photoBase64 arrives either bare or as a data: URL, depending on how it was
+// captured. vCard wants the payload only, plus the real image type.
+function ctPhotoParts(v){
+  const raw = String(v == null ? '' : v).trim();
+  if (!raw) return null;
+  const m = /^data:image\/([a-zA-Z]+);base64,(.*)$/.exec(raw);
+  if (m) return { type: m[1].toUpperCase() === 'JPG' ? 'JPEG' : m[1].toUpperCase(), data: m[2] };
+  if (/^[A-Za-z0-9+/=\s]+$/.test(raw) && raw.length > 100) return { type:'JPEG', data: raw.replace(/\s+/g,'') };
+  return null;
+}
+
+function buildVcf(rows, o){
+  const out = [];
+  rows.forEach(r => {
+    const fn   = ctFullName(r, o.pattern);
+    const tel  = ctPhone(r.mobileNo, o.cc);
+    const L = ['BEGIN:VCARD', 'VERSION:3.0'];
+    L.push('N:;' + vcEsc(fn) + ';;;');
+    L.push('FN:' + vcEsc(fn));
+    if (tel) L.push('TEL;TYPE=CELL:' + tel);
+    if (r.email) L.push('EMAIL;TYPE=INTERNET:' + vcEsc(r.email));
+    if (o.team && r.code) L.push('ORG:' + vcEsc('Team ' + codeGroup(r.code)));
+    const street = ctAddress(r);
+    if (street || r.city || r.state || r.pincode)
+      L.push('ADR;TYPE=HOME:;;' + vcEsc(street) + ';' + vcEsc(r.city||'') + ';'
+             + vcEsc(r.state||'') + ';' + vcEsc(r.pincode||'') + ';India');
+    const note = [
+      r.code     ? 'Code ' + r.code : '',
+      r.idNumber ? 'ID ' + r.idNumber : '',
+      r.dob      ? 'DOB ' + normDob(r.dob) : '',
+      r.gender   ? normGender(r.gender) : '',
+      r.district ? r.district : ''
+    ].filter(Boolean).join(' · ');
+    if (note) L.push('NOTE:' + vcEsc(note));
+    if (o.photos){
+      const ph = ctPhotoParts(r.photoBase64);
+      if (ph) L.push('PHOTO;ENCODING=b;TYPE=' + ph.type + ':' + ph.data);
+    }
+    L.push('END:VCARD');
+    out.push(L.map(vcFold).join('\r\n'));
+  });
+  return out.join('\r\n') + '\r\n';
+}
+
+// ── Google CSV ───────────────────────────────────────────────────────────
+function csvCell(v){
+  const t = String(v == null ? '' : v);
+  return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+}
+function buildContactsCsv(rows, o){
+  const head = ['Name','Given Name','Family Name','Group Membership',
+                'Phone 1 - Type','Phone 1 - Value','E-mail 1 - Type','E-mail 1 - Value',
+                'Organization 1 - Name','Address 1 - Type','Address 1 - Street',
+                'Address 1 - City','Address 1 - Region','Address 1 - Postal Code',
+                'Address 1 - Country','Notes'];
+  const lines = [head.join(',')];
+  rows.forEach(r => {
+    const fn = ctFullName(r, o.pattern);
+    lines.push([
+      fn, fn, '',
+      o.team && r.code ? ('Team ' + codeGroup(r.code) + ' ::: * myContacts') : '* myContacts',
+      'Mobile', ctPhone(r.mobileNo, o.cc),
+      r.email ? 'Home' : '', r.email || '',
+      o.team && r.code ? 'Team ' + codeGroup(r.code) : '',
+      'Home', ctAddress(r), r.city || '', r.state || '', r.pincode || '', 'India',
+      [r.code ? 'Code ' + r.code : '', r.idNumber ? 'ID ' + r.idNumber : '',
+       r.dob ? 'DOB ' + normDob(r.dob) : ''].filter(Boolean).join(' · ')
+    ].map(csvCell).join(','));
+  });
+  // Google's importer is much happier reading a BOM-led UTF-8 file.
+  return '\ufeff' + lines.join('\r\n') + '\r\n';
+}
+
+// ── the modal ────────────────────────────────────────────────────────────
+function openContacts(){
+  if (!displayRecords.length){ toast('NO RECORDS TO SAVE','err'); return; }
+  openOverlay('contacts-overlay');
+  ctPreview();
+}
+function closeContacts(){ closeOverlay('contacts-overlay'); }
+
+function ctPreview(){
+  const o    = ctOpts();
+  const all  = ctRecords();
+  const rows = o.skip ? all.filter(r => ctPhone(r.mobileNo, o.cc)) : all;
+  const picked = displayRecords.filter(r => selectedIds.has(String(r.id))).length;
+
+  document.getElementById('ct-scope').innerHTML = picked
+    ? `<strong>${picked}</strong> ticked record${picked===1?'':'s'}.`
+    : `Everything currently shown — <strong>${displayRecords.length}</strong> record${displayRecords.length===1?'':'s'}. Filter or tick rows first to narrow it.`;
+
+  const photoBox = document.getElementById('ct-photos');
+  photoBox.disabled = o.format !== 'vcf';
+  if (photoBox.disabled) photoBox.checked = false;
+
+  const sample  = rows[0] || all[0];
+  const dropped = all.length - rows.length;
+  const box = document.getElementById('ct-preview');
+  if (!sample){ box.innerHTML = '<span style="color:var(--red);">Nothing to export.</span>'; return; }
+
+  box.innerHTML =
+      '<div style="font-size:11px;letter-spacing:1.3px;color:var(--muted);font-family:\'Space Mono\',monospace;">FIRST CONTACT</div>'
+    + '<div style="font-size:17px;font-weight:700;margin-top:3px;">' + escHtml(ctFullName(sample, o.pattern)) + '</div>'
+    + '<div style="font-family:\'Space Mono\',monospace;font-size:12.5px;color:var(--muted);">'
+    + escHtml(ctPhone(sample.mobileNo, o.cc) || 'no mobile') + '</div>'
+    + '<div style="margin-top:8px;font-size:12.5px;"><strong>' + rows.length + '</strong> contact'
+    + (rows.length===1?'':'s') + ' → <code>' + (o.format==='vcf'?'.vcf':'.csv') + '</code>'
+    + (dropped ? ' · <span style="color:var(--orange);">' + dropped + ' skipped for having no mobile</span>' : '')
+    + '</div>';
+}
+
+function runContactsExport(){
+  const o    = ctOpts();
+  const all  = ctRecords();
+  const rows = o.skip ? all.filter(r => ctPhone(r.mobileNo, o.cc)) : all;
+  if (!rows.length){ toast('NOTHING TO EXPORT','err'); return; }
+
+  const vcf  = o.format === 'vcf';
+  const text = vcf ? buildVcf(rows, o) : buildContactsCsv(rows, o);
+  const blob = new Blob([text], { type: vcf ? 'text/vcard;charset=utf-8' : 'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  // Name the file after whichever team filter is in force, so a folder of
+  // these exports is still readable a month later.
+  const team = teamGroupFilter || document.getElementById('flt-code')?.value || '';
+  const tag  = team ? '-' + String(team).replace(/[^A-Za-z0-9]/g,'') : '';
+  a.href = url;
+  a.download = 'sevak-contacts' + tag + '-' + new Date().toISOString().slice(0,10) + (vcf ? '.vcf' : '.csv');
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  closeContacts();
+  toast(rows.length + ' CONTACT' + (rows.length===1?'':'S') + ' DOWNLOADED', 'ok');
 }
 
 // Minimal ZIP builder (store method, no compression — fine for XML files)
@@ -8509,6 +8763,7 @@ function cmdkActions(){
     { ic:'📊', tx:'Export filtered list to Excel', sub:'ACTION', run:exportExcel },
     { ic:'📄', tx:'Export filtered list to PDF',   sub:'ACTION', run:exportPDF },
     { ic:'🪪', tx:'Print ID cards',                sub:'ACTION', run:printIdCards },
+    { ic:'📇', tx:'Save to contacts (code + name)', sub:'ACTION', run:openContacts },
     { ic:'🆕', tx:'Show newest registrations first', sub:'ACTION', run:showNewestFirst },
     { ic:'◐',  tx:'Switch theme',                  sub:'ACTION', run:cycleTheme },
     { ic:'▤',  tx:'Toggle compact rows',           sub:'ACTION', run:toggleDensity },
