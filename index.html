@@ -1887,6 +1887,23 @@ td { border: none; }
 }
 .fast-existing[data-dirty="1"] .fast-tag::after { content: ' · EDITED'; color: var(--orange); }
 
+/* ── connection diagnosis banner ───────────────────────────────────────── */
+#conn-diag{ margin:10px 16px 0; border-radius:14px; overflow:hidden;
+  border:1px solid rgba(255,107,0,.45); background:var(--surface-2);
+  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  box-shadow:0 8px 28px rgba(0,0,0,.18); }
+#conn-diag[hidden]{ display:none; }
+#conn-diag .cd-head{ display:flex; align-items:center; gap:10px; padding:10px 16px;
+  background:linear-gradient(90deg,rgba(255,107,0,.92),rgba(255,107,0,.72)); color:#1a1008;
+  font-family:'Space Mono',monospace; font-size:11px; font-weight:700; letter-spacing:1.4px; }
+#conn-diag .cd-body{ padding:14px 16px 16px; font-size:13.5px; line-height:1.75; }
+#conn-diag .cd-why{ margin:0 0 10px; }
+#conn-diag code{ font-family:'Space Mono',monospace; font-size:11.5px;
+  background:var(--chrome); color:#7CFFB2; padding:2px 6px; border-radius:5px; }
+#conn-diag .cd-raw{ margin-top:10px; font-family:'Space Mono',monospace; font-size:11px;
+  color:var(--muted); word-break:break-word; }
+#conn-diag .cd-acts{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+@media (max-width:640px){ #conn-diag{ margin:10px 12px 0; } #conn-diag .cd-body{ font-size:12.5px; } }
 </style>
 </head>
 <body>
@@ -1944,6 +1961,11 @@ td { border: none; }
     <button class="nb nb-pink nb-sm" onclick="openAdd()">+ Add</button>
   </div>
 </nav>
+
+<!-- ═══ CONNECTION DIAGNOSIS ═══
+     The config bar is hidden, so a failed connection used to show nothing at
+     all: an empty registry that looked identical to a working one. -->
+<div id="conn-diag" hidden></div>
 
 <!-- ═══ SEARCH BAR (registry) ═══ -->
 <div id="search-bar">
@@ -3239,10 +3261,113 @@ async function supa(path, opts={}) {
     ...(opts.headers||{})
   };
   if(opts.method==='PATCH'||opts.method==='POST') h['Prefer']=h['Prefer']||'return=representation';
-  const res = await fetch(url, {...opts, headers:h});
-  if(!res.ok) throw new Error(await res.text()||'HTTP '+res.status);
+
+  // Everything below exists so a failure arrives with its status and PostgREST
+  // error code attached. Throwing the response body as a bare string threw all
+  // of that away, which is why "cannot connect" never said which of the six
+  // possible reasons it was.
+  let res;
+  try {
+    res = await fetch(url, {...opts, headers:h});
+  } catch(netErr){
+    const e = new Error('The browser could not reach '+SB_URL+' at all.');
+    e.status = 0; e.kind = 'network'; e.cause = netErr;
+    throw e;
+  }
+  if(!res.ok){
+    const raw = await res.text();
+    let parsed = null;
+    try { parsed = JSON.parse(raw); } catch(_){}
+    const e = new Error((parsed && (parsed.message||parsed.error_description||parsed.error))
+                        || raw || ('HTTP '+res.status));
+    e.status = res.status;
+    e.pgCode = parsed && parsed.code || '';
+    e.hint   = parsed && parsed.hint || '';
+    e.raw    = raw;
+    throw e;
+  }
   const t = await res.text();
   return t ? JSON.parse(t) : [];
+}
+
+// ── connection diagnosis ─────────────────────────────────────────────────
+// Turns a failure into the one sentence that says what to do about it.
+function diagnoseConnection(e){
+  const status = e && e.status;
+  const pg     = (e && e.pgCode) || '';
+  const msg    = (e && e.message) || '';
+
+  if (status === 0 || e.kind === 'network') return {
+    title: 'CANNOT REACH SUPABASE',
+    why: 'The browser could not open a connection to <code>'+escHtml(SB_URL)+'</code>. '
+       + 'Nothing reached the database, so this is not a permissions problem.',
+    fix: ['Check the device is online.',
+          'Check the project is not paused — a free Supabase project sleeps after a week '
+          + 'of no traffic and has to be resumed from the dashboard.',
+          'Check the URL is the Project URL from Settings → API, and starts with <code>https://</code>.']
+  };
+  if (status === 401 || status === 403) return {
+    title: 'SUPABASE REFUSED THE KEY',
+    why: 'The database answered, but rejected the anon key — so the key is wrong, has been '
+       + 'rotated, or the request never got past Row Level Security.',
+    fix: ['Settings → API → copy the <strong>anon public</strong> key again '
+          + '(the <code>service_role</code> key will not work from a browser).',
+          'If the key is right, the table has Row Level Security on with no policy attached. '
+          + 'Run <code>supabase-setup.sql</code> in the SQL editor.']
+  };
+  if (status === 404) return {
+    title: 'NO SUCH TABLE: ' + escHtml(TABLE).toUpperCase(),
+    why: 'The project is reachable and the key works, but it has no table called '
+       + '<code>'+escHtml(TABLE)+'</code> exposed on the API.',
+    fix: ['Check the spelling — table names are case sensitive.',
+          'Check the table is in the <code>public</code> schema; the API does not expose other schemas by default.']
+  };
+  if (pg === '42P01') return {
+    title: 'NO SUCH TABLE: ' + escHtml(TABLE).toUpperCase(),
+    why: 'Postgres says the table <code>'+escHtml(TABLE)+'</code> does not exist.',
+    fix: ['Check the name in the config bar against the Table Editor.']
+  };
+  if (pg === '42703' || pg === 'PGRST100' || pg === 'PGRST204') return {
+    title: 'A COLUMN THE APP NEEDS IS MISSING',
+    why: 'The table exists, but Postgres rejected the query over a column: <code>'
+       + escHtml(msg) + '</code>',
+    fix: ['Column names are case sensitive — <code>idNumber</code> is not <code>idnumber</code>.',
+          'If a column was just added, the API keeps a cached copy of the schema. '
+          + 'Run <code>notify pgrst, \'reload schema\';</code> in the SQL editor.']
+  };
+  if (status >= 500) return {
+    title: 'SUPABASE RETURNED AN ERROR',
+    why: 'The database is reachable but failed to answer (HTTP '+status+'). '
+       + 'This is usually temporary, or the project is out of its free quota.',
+    fix: ['Try again in a minute.', 'Check the project dashboard for an outage or a paused project.']
+  };
+  return {
+    title: 'CONNECTION FAILED',
+    why: 'Supabase answered with something the app did not expect.',
+    fix: ['Open the settings (⚙) and check the URL, key and table name.']
+  };
+}
+
+function showConnDiag(d, rawText){
+  const box = document.getElementById('conn-diag');
+  if (!box) return;
+  box.hidden = false;
+  box.innerHTML = '<div class="cd-head">⚠ ' + d.title + '</div>'
+    + '<div class="cd-body">'
+    + '<p class="cd-why">' + d.why + '</p>'
+    + '<ol style="margin:0 0 0 18px;padding:0;">'
+    + d.fix.map(f => '<li style="margin-bottom:4px;">'+f+'</li>').join('')
+    + '</ol>'
+    + (rawText ? '<div class="cd-raw">' + escHtml(String(rawText).slice(0,400)) + '</div>' : '')
+    + '<div class="cd-acts">'
+    + '<button class="nb nb-green nb-sm" onclick="connect()">↻ TRY AGAIN</button>'
+    + '<button class="nb nb-black nb-sm" onclick="toggleCfgBar()">⚙ SETTINGS</button>'
+    + '</div></div>';
+}
+
+function hideConnDiag(){
+  const box = document.getElementById('conn-diag');
+  if (box){ box.hidden = true; box.innerHTML = ''; }
 }
 
 // Primary key filter that survives uuid/text ids as well as ints.
@@ -3319,6 +3444,7 @@ async function connect() {
   tableColumns = new Set(); knownMissingCols = new Set();
   const st = document.getElementById('conn-status');
   st.textContent='⏳ connecting…'; st.style.color='#FFE500';
+  hideConnDiag();
   try {
     await fetchAll();
     st.textContent='✓ connected'; st.style.color='#00C16A';
@@ -3328,8 +3454,17 @@ async function connect() {
     // table, so say which one it is instead of showing a blank registry.
     if (!allRecords.length){
       st.innerHTML = `<span style="color:#00C16A">✓ connected</span> &nbsp;<span style="color:#FF6B00;font-size:9px;">`
-        + `⚠ 0 ROWS — IF THE TABLE IS NOT EMPTY, RUN supabase-setup.sql (RLS POLICY MISSING)</span>`;
-      toast('CONNECTED BUT 0 ROWS — CHECK THE TABLE NAME, OR RUN supabase-setup.sql','err');
+        + `⚠ 0 ROWS</span>`;
+      showConnDiag({
+        title: 'CONNECTED, BUT THE TABLE LOOKS EMPTY',
+        why: 'Supabase accepted the key and the table <code>'+escHtml(TABLE)+'</code> exists, '
+           + 'but it returned no rows. If you know there are people in it, they are being '
+           + 'hidden rather than missing: Row Level Security with no policy attached returns '
+           + 'an empty list instead of an error.',
+        fix: ['Run <code>supabase-setup.sql</code> in the Supabase SQL editor, then press TRY AGAIN.',
+              'If the table really is empty, this message is correct — register someone and it goes away.']
+      });
+      toast('CONNECTED BUT 0 ROWS','err');
     } else toast('CONNECTED TO SUPABASE','ok');
     if (typeof staffAfterConnect === 'function') staffAfterConnect();
     // A sheet opened before the records landed numbered itself against an
@@ -3339,7 +3474,15 @@ async function connect() {
     }
   } catch(e) {
     st.textContent='✗ failed'; st.style.color='#E63030';
-    toast('CONNECT FAILED: '+e.message,'err');
+    console.error('Supabase connect failed:', e);
+    // fetchAll() puts up loading skeletons before it asks. Left behind on a
+    // failure they read as "still loading", so the page looks busy forever
+    // instead of broken. Clear them and let the empty state show.
+    allRecords = [];
+    try { applyFilters(); } catch(_){}
+    document.getElementById('tc-records').textContent = '0';
+    showConnDiag(diagnoseConnection(e), e.raw || e.message);
+    toast('CONNECT FAILED — SEE THE ORANGE PANEL','err');
   }
 }
 
