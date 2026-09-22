@@ -2030,6 +2030,9 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
     <button class="tab-btn" data-tab="ttd" onclick="switchTab('ttd')">
       TTD <span class="tab-count" id="tc-ttd">0</span>
     </button>
+    <button class="tab-btn" data-tab="control" onclick="switchTab('control')">
+      Control <span class="tab-count" id="tc-live">0</span>
+    </button>
     <button class="tab-btn" data-tab="checker" onclick="switchTab('checker')">
       Checker <span class="tab-count issues" id="tc-issues">0</span>
     </button>
@@ -2557,6 +2560,76 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
 </div>
 
 <!-- ═══════════════════ PAGE: TEAMS ═══════════════════ -->
+<!-- ═══════════════════ PAGE: CONTROL ROOM ═══════════════════ -->
+<div class="page" id="pg-control">
+  <div class="chk-header">
+    <div>
+      <h2>CONTROL ROOM</h2>
+      <p>Every browser running the TTD script that is set to <strong>all devices</strong> and on this room
+         reports in here. Push the service, the dates, the ticket count, who to book and the time to fire —
+         to all of them, or to one.</p>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <div class="fld" style="margin:0;min-width:140px;">
+        <label for="ctl-room">Room</label>
+        <input id="ctl-room" value="default" spellcheck="false" />
+      </div>
+      <button class="nb nb-blue" onclick="ctlRefresh()">↻ REFRESH</button>
+    </div>
+  </div>
+  <div class="stats-strip" id="ctl-strip" style="display:none;"></div>
+
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:18px;
+              align-items:start;padding:0 16px 20px;">
+    <div id="ctl-devices"></div>
+
+    <div style="padding:16px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line);
+                position:sticky;top:16px;">
+      <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1.6px;color:var(--muted);
+           margin-bottom:12px;">PUSH SETTINGS</div>
+
+      <div class="fld"><label for="ctl-service">Service to open</label>
+        <select id="ctl-service"></select></div>
+
+      <div class="fld"><label for="ctl-dates">Dates to try</label>
+        <input id="ctl-dates" placeholder="2026-10-02, 03/10/2026" />
+        <div style="font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.6;">
+          Tried in the order listed. Leave empty to let each device pick the earliest open date.</div></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="fld"><label for="ctl-tickets">Tickets</label>
+          <input id="ctl-tickets" type="number" min="1" max="20" value="2" /></div>
+        <div class="fld"><label for="ctl-time">Fire at (IST)</label>
+          <input id="ctl-time" type="time" step="1" /></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="fld"><label for="ctl-team">Team</label>
+          <input id="ctl-team" placeholder="e.g. KSS" spellcheck="false" /></div>
+        <div class="fld"><label for="ctl-code">Book this code</label>
+          <input id="ctl-code" placeholder="e.g. KSS3" spellcheck="false" list="ctl-codes" />
+          <datalist id="ctl-codes"></datalist></div>
+      </div>
+
+      <div style="font-size:11.5px;color:var(--muted);line-height:1.6;margin:-4px 0 12px;">
+        Leave a field empty and that device keeps what it already has.</div>
+
+      <div class="fld"><label for="ctl-who">Send to</label>
+        <select id="ctl-who"><option value="">Every device on this room</option></select></div>
+
+      <button class="nb nb-green" style="width:100%;" onclick="ctlPush()">⬆ PUSH SETTINGS</button>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="nb nb-purple nb-sm" style="flex:1;" onclick="ctlCmd('open')">⚡ OPEN NOW</button>
+        <button class="nb nb-ghost nb-sm" style="flex:1;" onclick="ctlCmd('start')">▶ START</button>
+        <button class="nb nb-red nb-sm" style="flex:1;" onclick="ctlCmd('stop')">■ STOP</button>
+      </div>
+
+      <div id="ctl-msg" style="font-family:'Space Mono',monospace;font-size:11px;min-height:34px;
+           margin-top:12px;line-height:1.6;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════ PAGE: TTD BOOKINGS ═══════════════════ -->
 <div class="page" id="pg-ttd">
   <div class="chk-header">
@@ -3477,13 +3550,14 @@ function switchTab(tab) {
   const showSearch = tab==='list';
   document.getElementById('search-bar').style.display = showSearch?'':'none';
   document.getElementById('ai-drawer').classList.remove('open');
-  const pg = {list:'pg-list',detail:'pg-detail',register:'pg-register',checker:'pg-checker',month:'pg-month',teams:'pg-teams',staff:'pg-staff',fast:'pg-fast',ttd:'pg-ttd'}[tab];
+  const pg = {list:'pg-list',detail:'pg-detail',register:'pg-register',checker:'pg-checker',month:'pg-month',teams:'pg-teams',staff:'pg-staff',fast:'pg-fast',ttd:'pg-ttd',control:'pg-control'}[tab];
   if(pg) document.getElementById(pg).classList.add('active');
   if(tab==='month') renderMonth();
   if(tab==='teams') renderTeams();
   if(tab==='staff') renderStaff();
   if(tab==='fast') fastEnter();
   if(tab==='ttd') ttdEnter();
+  if(tab==='control') ctlEnter();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -7862,6 +7936,184 @@ document.getElementById('teams-body').addEventListener('click', e => {
 });
 
 // ════════════════════════════════════════════
+// CONTROL ROOM  (ttd_devices + ttd_commands)
+// ════════════════════════════════════════════
+// Every browser running the TTD userscript in "all devices" mode reports in
+// every few seconds. This tab lists them and posts commands back. The script
+// polls for commands about once a second, so a push lands almost at once.
+
+const CTL_DEV = 'ttd_devices', CTL_CMD = 'ttd_commands';
+const CTL_SERVICES = [
+  'Angapradakshinam', 'Angapradakshinam (for Locals)',
+  'Differently Abled/Sr.Citizen Darshan', 'Special Entry Darshan',
+  'Special Entry Darshan (Ammavari Temple)', 'Arjitha Sevas',
+  'Online Sevas (Virtual Participation)', 'Accommodation'
+];
+// A device that has not reported in this long is treated as gone.
+const CTL_STALE_MS = 25000;
+
+let ctlDevices = [], ctlTimer = null, ctlStarted = false;
+
+const ctlRoom = () => (document.getElementById('ctl-room')?.value || 'default').trim() || 'default';
+
+function ctlEnter(){
+  if (!ctlStarted){
+    ctlStarted = true;
+    document.getElementById('ctl-service').innerHTML =
+      '<option value="">— leave as it is —</option>' +
+      CTL_SERVICES.map(x => `<option>${escHtml(x)}</option>`).join('');
+    try { document.getElementById('ctl-room').value = localStorage.getItem('ttdCtlRoom') || 'default'; } catch(_){}
+    document.getElementById('ctl-room').addEventListener('change', e => {
+      try { localStorage.setItem('ttdCtlRoom', e.target.value.trim() || 'default'); } catch(_){}
+      ctlRefresh();
+    });
+  }
+  ctlRefresh();
+  // Poll only while this tab is on screen — no point asking when nobody looks.
+  clearInterval(ctlTimer);
+  ctlTimer = setInterval(() => {
+    if (document.getElementById('pg-control').classList.contains('active') && !document.hidden) ctlRefresh(true);
+    else { clearInterval(ctlTimer); ctlTimer = null; }
+  }, 4000);
+}
+
+async function ctlRefresh(quiet){
+  try {
+    ctlDevices = await supa(`${CTL_DEV}?room=eq.${encodeURIComponent(ctlRoom())}&order=seen_at.desc`);
+    ctlRender();
+  } catch(e){
+    const missing = e.status === 404 || e.pgCode === '42P01';
+    if (!quiet) document.getElementById('ctl-devices').innerHTML =
+      `<div class="chk-empty"><div class="big">${missing ? 'NO TTD_DEVICES TABLE' : 'COULD NOT LOAD'}</div>
+       <p>${missing ? 'Run <code>supabase-ttd-control.sql</code> in the Supabase SQL editor, then press REFRESH.'
+                    : escHtml(e.message)}</p></div>`;
+  }
+}
+
+const ctlAge = d => Math.round((Date.now() - new Date(d.seen_at).getTime()) / 1000);
+const ctlLive = d => ctlAge(d) * 1000 < CTL_STALE_MS;
+
+function ctlRender(){
+  const box = document.getElementById('ctl-devices');
+  const live = ctlDevices.filter(ctlLive);
+  const gone = ctlDevices.filter(d => !ctlLive(d));
+
+  const badge = document.getElementById('tc-live');
+  if (badge) badge.textContent = live.length;
+
+  const strip = document.getElementById('ctl-strip');
+  strip.style.display = ctlDevices.length ? '' : 'none';
+  strip.innerHTML = `
+    <div class="stat c1"><div class="v">${live.length}</div><div class="l">ONLINE</div></div>
+    <div class="stat c2"><div class="v">${live.filter(d=>d.running).length}</div><div class="l">RUNNING</div></div>
+    <div class="stat c3"><div class="v">${new Set(live.map(d=>d.team).filter(Boolean)).size}</div><div class="l">TEAMS</div></div>
+    <div class="stat c4"><div class="v">${gone.length}</div><div class="l">OFFLINE</div></div>`;
+
+  // "Send to" keeps whatever was chosen, as long as that device is still here.
+  const who = document.getElementById('ctl-who');
+  const keep = who.value;
+  who.innerHTML = '<option value="">Every device on this room</option>' +
+    live.map(d => `<option value="${escAttr(d.device)}">${escHtml(d.device)}${d.team ? ' · ' + escHtml(d.team) : ''}</option>`).join('');
+  if (keep && live.some(d => d.device === keep)) who.value = keep;
+
+  if (!ctlDevices.length){
+    box.innerHTML = `<div class="chk-empty"><div class="big">NOBODY REPORTING</div>
+      <p>On each browser: open the TTD panel, press ⏰, and tap the reach label until it says
+      <strong>all devices</strong>. Set the room to <strong>${escHtml(ctlRoom())}</strong> on every one.</p></div>`;
+    return;
+  }
+
+  const card = d => {
+    const age = ctlAge(d), on = ctlLive(d);
+    return `<div style="padding:14px 16px;border-radius:14px;margin-bottom:10px;
+         background:var(--surface-2);border:1px solid ${on ? 'var(--line)' : 'transparent'};
+         opacity:${on ? 1 : .45};">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;
+              background:${on ? (d.running ? 'var(--green)' : 'var(--blue)') : 'var(--muted)'};"></span>
+        <strong style="font-family:'Space Mono',monospace;font-size:13px;">${escHtml(d.device)}</strong>
+        ${d.running ? '<span class="tab-count" style="background:var(--green);color:#052e16;">RUNNING</span>' : ''}
+        <span style="margin-left:auto;font-size:11.5px;color:var(--muted);font-family:'Space Mono',monospace;">
+          ${on ? (age < 10 ? 'just now' : age + 's ago') : 'offline ' + (age > 3600 ? Math.round(age/3600)+'h' : Math.round(age/60)+'m')}</span>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:9px;font-size:12.5px;color:var(--muted);">
+        <span>team <strong style="color:var(--fg);">${escHtml(d.team || '—')}</strong></span>
+        <span>booking <strong style="color:var(--fg);">${escHtml(d.picked || '—')}</strong></span>
+        <span>on <strong style="color:var(--fg);">${escHtml(d.page || '—')}</strong></span>
+      </div>
+      ${d.service ? `<div style="margin-top:6px;font-size:12px;color:var(--muted);">will open ${escHtml(d.service)}</div>` : ''}
+      <div style="display:flex;gap:6px;margin-top:11px;">
+        <button class="nb nb-ghost nb-sm" onclick="ctlOne('${escAttr(d.device)}')">🎯 SEND TO THIS ONE</button>
+        <button class="nb nb-red nb-sm" onclick="ctlCmd('stop','${escAttr(d.device)}')">■ STOP</button>
+      </div>
+    </div>`;
+  };
+
+  box.innerHTML = live.map(card).join('')
+    + (gone.length ? `<div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1.4px;
+         color:var(--muted);margin:16px 0 8px;">NOT REPORTING</div>` + gone.map(card).join('') : '');
+}
+
+function ctlOne(device){
+  document.getElementById('ctl-who').value = device;
+  ctlMsg('Sending to ' + device + ' only.', 'ok');
+  document.getElementById('ctl-service').focus();
+}
+
+function ctlMsg(text, tone){
+  const el = document.getElementById('ctl-msg');
+  if (!el) return;
+  el.textContent = text || '';
+  el.style.color = tone === 'ok' ? 'var(--green)' : tone === 'warn' ? 'var(--orange)' : 'var(--red)';
+}
+
+async function ctlPost(row){
+  return supa(CTL_CMD, { method:'POST', headers:{'Prefer':'return=minimal'},
+                         body: JSON.stringify(Object.assign({ room: ctlRoom(), issued_by: 'control-room' }, row)) });
+}
+
+// Only the fields that were filled in are sent — an empty box means "leave that
+// device's setting alone", not "clear it".
+async function ctlPush(){
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  const payload = {};
+  if (g('ctl-service')) payload.service = g('ctl-service');
+  if (g('ctl-dates'))   payload.dates   = g('ctl-dates');
+  if (g('ctl-tickets')) payload.tickets = +g('ctl-tickets');
+  if (g('ctl-team'))    payload.team    = g('ctl-team').toUpperCase();
+  if (g('ctl-code'))    payload.code    = g('ctl-code').toUpperCase();
+  if (g('ctl-time'))    payload.time    = g('ctl-time');
+
+  if (!Object.keys(payload).length){ ctlMsg('Nothing filled in — every field is empty.', 'warn'); return; }
+
+  const to = document.getElementById('ctl-who').value || null;
+  const live = ctlDevices.filter(ctlLive);
+  if (!live.length){ ctlMsg('No device is reporting in — nothing would receive this.', 'warn'); return; }
+
+  try {
+    await ctlPost({ cmd:'config', payload: payload, to_device: to });
+    const n = to ? 1 : live.length;
+    ctlMsg(`Sent ${Object.keys(payload).join(', ')} to ${to || n + ' device' + (n===1?'':'s')}. `
+         + `They apply it within a second.`, 'ok');
+    toast('SETTINGS PUSHED', 'ok');
+    setTimeout(ctlRefresh, 1800);
+  } catch(e){ ctlMsg(e.message, 'err'); }
+}
+
+async function ctlCmd(cmd, device){
+  const to = device || document.getElementById('ctl-who').value || null;
+  const target = cmd === 'open' ? (document.getElementById('ctl-service').value || '') : null;
+  if (cmd === 'open' && !target){ ctlMsg('Choose a service first.', 'warn'); return; }
+  try {
+    await ctlPost({ cmd: cmd, target: target, to_device: to });
+    ctlMsg({ open:'Opening ' + target, start:'Started', stop:'Stopped' }[cmd]
+           + ' on ' + (to || 'every device on this room') + '.', 'ok');
+    toast(cmd.toUpperCase() + ' SENT', 'ok');
+    setTimeout(ctlRefresh, 1800);
+  } catch(e){ ctlMsg(e.message, 'err'); }
+}
+
+// ════════════════════════════════════════════
 // TTD BOOKINGS  (the ttd_db table)
 // ════════════════════════════════════════════
 // The Tampermonkey scripts read this table with the anon key and cannot write
@@ -7889,6 +8141,7 @@ async function ttdLoad(){
     ttdRows = await supa(`${TTD_TABLE}?select=*&order=code.asc`);
     ttdLoaded = true;
     ttdRender();
+    ctlFillCodes();
   } catch(e){
     // A missing table is the ordinary first-run case, not a failure worth a
     // stack trace — say which SQL file creates it.
@@ -7922,6 +8175,13 @@ function ttdFiltered(){
   return ttdRows.filter(r => [r.code, r.sevakname, r.mobile, r.idnumber]
     .concat(ttdPartyOf(r).map(x => x.name))
     .some(v => String(v||'').toLowerCase().includes(q)));
+}
+
+// The booking codes, offered to the control room's "book this code" box.
+function ctlFillCodes(){
+  const dl = document.getElementById('ctl-codes');
+  if (!dl) return;
+  dl.innerHTML = ttdRows.map(r => `<option value="${escAttr(r.code||'')}">`).join('');
 }
 
 function ttdRender(){
@@ -8238,6 +8498,7 @@ async function ttdSave(){
     }
     ttdRows.sort((a,b) => String(a.code||'').localeCompare(String(b.code||''), undefined, {numeric:true}));
     ttdRender();
+    ctlFillCodes();
     ttdClose();
   } catch(e){
     // 23505 is the unique index on code — a far more useful thing to say than
@@ -9808,6 +10069,7 @@ function cmdkActions(){
     { ic:'📇', tx:'Save to contacts (code + name)', sub:'ACTION', run:openContacts },
     { ic:'⇄', tx:'Merge two teams',             sub:'ACTION', run:openMergeModal },
     { ic:'🛕', tx:'TTD bookings',                sub:'TAB',    run:() => switchTab('ttd') },
+    { ic:'🎛', tx:'Control room — live sessions', sub:'TAB',    run:() => switchTab('control') },
     { ic:'✚', tx:'New TTD booking',             sub:'ACTION', run:() => { switchTab('ttd'); ttdNew(); } },
     { ic:'🆕', tx:'Show newest registrations first', sub:'ACTION', run:showNewestFirst },
     { ic:'◐',  tx:'Switch theme',                  sub:'ACTION', run:cycleTheme },
