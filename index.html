@@ -2481,6 +2481,7 @@ td { border: none; }
         <span class="ico" aria-hidden="true">⌕</span>
         <input type="text" id="teams-search" placeholder="Search team, code, leader…" aria-label="Search teams" />
       </div>
+      <button class="nb nb-purple" onclick="openMergeModal()">⇄ MERGE TEAMS</button>
       <button class="nb nb-red" onclick="printTeamList()">📄 PRINT TEAM LIST</button>
       <button class="nb nb-blue" onclick="renderTeams()">↻ REFRESH</button>
     </div>
@@ -2766,6 +2767,47 @@ td { border: none; }
     <div class="modal-footer">
       <button class="nb nb-ghost" onclick="closeContacts()">CANCEL</button>
       <button class="nb nb-green" onclick="runContactsExport()" id="ct-go">⬇ DOWNLOAD</button>
+    </div>
+  </div>
+</div>
+
+<!-- MERGE TEAMS MODAL -->
+<div class="overlay" id="merge-overlay">
+  <div class="modal" style="max-width:620px;" role="dialog" aria-modal="true" aria-label="Merge two teams">
+    <button class="btn-x" onclick="closeMergeModal()" title="Close" aria-label="Close">✕</button>
+    <div class="modal-title">⇄ MERGE TWO <span class="hi">TEAMS</span></div>
+    <p style="font-size:13.5px;line-height:1.7;color:var(--muted);margin-bottom:16px;">
+      Everyone in the team that moves is renumbered into the team that stays, continuing
+      its codes. Nobody is deleted and no details change — only the code.
+    </p>
+
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:end;">
+      <div class="fld" style="margin:0;">
+        <label for="mg-src">Team that moves (disappears)</label>
+        <select id="mg-src" onchange="renderMergePlan()"></select>
+      </div>
+      <div style="padding-bottom:10px;font-size:20px;color:var(--muted);">→</div>
+      <div class="fld" style="margin:0;">
+        <label for="mg-dst">Team that stays</label>
+        <select id="mg-dst" onchange="renderMergePlan()"></select>
+      </div>
+    </div>
+    <button class="nb nb-ghost nb-sm" style="margin-top:8px;" onclick="swapMergeSides()">⇅ SWAP</button>
+
+    <div id="mg-plan" style="margin-top:16px;"></div>
+
+    <div id="mg-prog-wrap" style="display:none;margin-top:12px;">
+      <div style="background:var(--surface-2);border:1px solid var(--line);border-radius:8px;height:14px;overflow:hidden;margin-bottom:6px;">
+        <div id="mg-prog-fill" style="height:100%;background:var(--green);width:0%;transition:width .3s;"></div>
+      </div>
+      <div id="mg-log" style="font-family:'Space Mono',monospace;font-size:10px;max-height:130px;
+           overflow-y:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;"></div>
+    </div>
+    <div id="mg-status" style="font-family:'Space Mono',monospace;font-size:11px;min-height:18px;margin-top:8px;"></div>
+
+    <div class="modal-footer">
+      <button class="nb nb-ghost" onclick="closeMergeModal()">CANCEL</button>
+      <button class="nb nb-purple" id="mg-go" onclick="runMerge()">⇄ MERGE</button>
     </div>
   </div>
 </div>
@@ -3983,6 +4025,7 @@ function closeOverlay(id){
 document.getElementById('form-overlay').onclick=e=>{if(e.target===e.currentTarget)closeModal();};
 document.getElementById('del-overlay').onclick=e=>{if(e.target===e.currentTarget)closeDel();};
 document.getElementById('contacts-overlay').onclick=e=>{if(e.target===e.currentTarget)closeContacts();};
+document.getElementById('merge-overlay').onclick=e=>{if(e.target===e.currentTarget)closeMergeModal();};
 
 document.addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
@@ -7457,6 +7500,239 @@ document.getElementById('teams-body').addEventListener('click', e => {
   if (b.dataset.act === 'sheet')   printTeamSheet(code);
 });
 
+// ════════════════════════════════════════════
+// MERGE TWO TEAMS
+// ════════════════════════════════════════════
+// A team is only ever the prefix of its members' codes, so merging is a
+// renumbering: everyone in the team that moves is given the next free code in
+// the team that stays. Nothing is deleted and no other field is touched.
+
+// The numbering style already in use by the surviving team — its separator and
+// its zero padding — so merged codes look like the ones already there rather
+// than introducing a second convention.
+function mergeCodeStyle(dstGroup){
+  const parsed = allRecords
+    .filter(r => codeGroup(r.code) === dstGroup)
+    .map(r => parseSeq(r.code))
+    .filter(Boolean);
+  if (!parsed.length) return { prefix: dstGroup, pad: 1, next: 1 };
+  const top = parsed.reduce((a,p) => p.num > a.num ? p : a, parsed[0]);
+  return {
+    prefix: top.prefix,
+    pad: Math.max(...parsed.map(p => p.pad)),
+    next: Math.max(...parsed.map(p => p.num)) + 1
+  };
+}
+
+// old code -> new code for every member that moves. Any code already spoken
+// for anywhere in the registry is skipped rather than handed out twice.
+function mergePlan(srcGroup, dstGroup){
+  const movers = allRecords
+    .filter(r => codeGroup(r.code) === srcGroup)
+    .sort(byCodeOrder);
+  const taken = new Set(allKnownCodes().map(c => String(c).trim().toUpperCase()));
+  const style = mergeCodeStyle(dstGroup);
+  let n = style.next;
+  return movers.map(r => {
+    let code;
+    do { code = style.prefix + String(n++).padStart(style.pad, '0'); }
+    while (taken.has(code.toUpperCase()));
+    taken.add(code.toUpperCase());
+    return { rec: r, from: String(r.code || '').trim(), to: code };
+  });
+}
+
+// What happens to the things attached to the team that disappears.
+function mergeSideEffects(srcGroup, dstGroup){
+  const moves = [], drops = [];
+  (staffAssignments || []).forEach(a => {
+    if (a.group !== srcGroup) return;
+    const taken = staffAssignments.some(b => b.group === dstGroup && b.month === a.month);
+    (taken ? drops : moves).push(a);
+  });
+  return {
+    staffMoves: moves,
+    staffDrops: drops,
+    name:  teamNames[srcGroup]    && teamNames[srcGroup]    !== srcGroup ? teamNames[srcGroup] : '',
+    leader: teamLeaders[srcGroup] != null,
+    wa:    !!teamWhatsapp[srcGroup]
+  };
+}
+
+function mergeTeamOptions(){
+  return buildTeams().filter(t => t.real && t.code !== NO_CODE);
+}
+
+function openMergeModal(){
+  const teams = mergeTeamOptions();
+  if (teams.length < 2){ toast('NEED AT LEAST TWO TEAMS TO MERGE','err'); return; }
+  const opts = teams.map(t =>
+    `<option value="${escAttr(t.code)}">${escHtml(t.name)}${t.name!==t.code?' ('+escHtml(t.code)+')':''} — ${t.members.length}</option>`
+  ).join('');
+  const src = document.getElementById('mg-src'), dst = document.getElementById('mg-dst');
+  src.innerHTML = opts; dst.innerHTML = opts;
+  // Default to merging the smallest team into the largest, which is what a
+  // merge nearly always is.
+  const bySize = [...teams].sort((a,b) => a.members.length - b.members.length);
+  src.value = bySize[0].code;
+  dst.value = bySize[bySize.length-1].code;
+  document.getElementById('mg-prog-wrap').style.display = 'none';
+  document.getElementById('mg-log').innerHTML = '';
+  document.getElementById('mg-status').textContent = '';
+  const go = document.getElementById('mg-go');
+  go.disabled = false; go.textContent = '⇄ MERGE'; go.className = 'nb nb-purple';
+  go.onclick = runMerge;
+  openOverlay('merge-overlay');
+  renderMergePlan();
+}
+function closeMergeModal(){ closeOverlay('merge-overlay'); }
+
+function swapMergeSides(){
+  const src = document.getElementById('mg-src'), dst = document.getElementById('mg-dst');
+  const a = src.value; src.value = dst.value; dst.value = a;
+  renderMergePlan();
+}
+
+function renderMergePlan(){
+  const src = document.getElementById('mg-src').value;
+  const dst = document.getElementById('mg-dst').value;
+  const box = document.getElementById('mg-plan');
+  const go  = document.getElementById('mg-go');
+
+  if (src === dst){
+    box.innerHTML = `<div style="padding:12px 14px;border-radius:12px;background:var(--surface-2);
+      border:1px solid var(--line);font-size:13px;color:var(--red);">
+      Pick two different teams.</div>`;
+    go.disabled = true;
+    return;
+  }
+
+  const plan = mergePlan(src, dst);
+  const fx   = mergeSideEffects(src, dst);
+  const dstCount = allRecords.filter(r => codeGroup(r.code) === dst).length;
+  go.disabled = plan.length === 0;
+
+  const rows = plan.slice(0, 8).map(p =>
+    `<tr><td style="padding:3px 10px 3px 0;">${escHtml(fullName(p.rec))}</td>
+         <td style="padding:3px 8px;font-family:'Space Mono',monospace;color:var(--muted);">${escHtml(p.from||'—')}</td>
+         <td style="padding:3px 4px;color:var(--muted);">→</td>
+         <td style="padding:3px 0;font-family:'Space Mono',monospace;font-weight:700;">${escHtml(p.to)}</td></tr>`
+  ).join('');
+
+  const notes = [];
+  if (fx.name)   notes.push(`the name “${escHtml(fx.name)}” is dropped`);
+  if (fx.leader) notes.push('its pinned leader is dropped');
+  if (fx.wa)     notes.push('its WhatsApp link is dropped');
+  if (fx.staffMoves.length)
+    notes.push(fx.staffMoves.length === 1
+      ? `1 staff assignment moves to ${escHtml(dst)}`
+      : `${fx.staffMoves.length} staff assignments move to ${escHtml(dst)}`);
+  if (fx.staffDrops.length)
+    notes.push(fx.staffDrops.length === 1
+      ? `1 staff assignment is dropped, because ${escHtml(dst)} already has someone that month`
+      : `${fx.staffDrops.length} staff assignments are dropped, because ${escHtml(dst)} already has someone those months`);
+
+  box.innerHTML = `
+    <div style="padding:13px 15px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);">
+      <div style="font-size:14px;line-height:1.7;">
+        <strong>${plan.length}</strong> member${plan.length===1?'':'s'} move from
+        <strong>${escHtml(src)}</strong> into <strong>${escHtml(dst)}</strong>,
+        which then has <strong>${dstCount + plan.length}</strong> members.
+      </div>
+      ${plan.length ? `<table style="margin-top:10px;font-size:12.5px;border-collapse:collapse;">${rows}</table>
+        ${plan.length > 8 ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;">
+            …and ${plan.length-8} more, numbered on through ${escHtml(plan[plan.length-1].to)}.</div>` : ''}`
+        : `<div style="margin-top:8px;font-size:13px;color:var(--orange);">That team has no members.</div>`}
+      ${notes.length ? `<div style="margin-top:11px;padding-top:10px;border-top:1px solid var(--line);
+          font-size:12.5px;line-height:1.75;color:var(--muted);">Also: ${notes.join('; ')}.</div>` : ''}
+      <div style="margin-top:11px;font-size:12px;color:var(--orange);line-height:1.6;">
+        ⚠ This rewrites ${plan.length} code${plan.length===1?'':'s'} in Supabase and cannot be undone
+        in one step. Old codes are not kept anywhere.
+      </div>
+    </div>`;
+}
+
+async function runMerge(){
+  const src = document.getElementById('mg-src').value;
+  const dst = document.getElementById('mg-dst').value;
+  if (src === dst) return;
+  const plan = mergePlan(src, dst);
+  if (!plan.length){ toast('NOTHING TO MERGE','err'); return; }
+  const fx = mergeSideEffects(src, dst);
+
+  const go     = document.getElementById('mg-go');
+  const wrap   = document.getElementById('mg-prog-wrap');
+  const fill   = document.getElementById('mg-prog-fill');
+  const logBox = document.getElementById('mg-log');
+  const status = document.getElementById('mg-status');
+  go.disabled = true;
+  wrap.style.display = '';
+  logBox.innerHTML = '';
+  const addLog = (color, text) => {
+    const d = document.createElement('div');
+    d.style.color = color; d.textContent = text;
+    logBox.appendChild(d); logBox.scrollTop = logBox.scrollHeight;
+  };
+
+  let done = 0, failed = 0;
+  for (let i = 0; i < plan.length; i++){
+    const { rec, from, to } = plan[i];
+    fill.style.width = Math.round((i / plan.length) * 95) + '%';
+    status.style.color = 'var(--blue)';
+    status.textContent = `⏳ ${i+1} / ${plan.length}…`;
+    try {
+      const rows = await supa(`${TABLE}?${pkEq(rec.id)}`, {
+        method:'PATCH', body: JSON.stringify({ code: to })
+      });
+      if (!Array.isArray(rows) || rows.length === 0) throw new Error('No row matched');
+      rec.code = to;
+      const disp = displayRecords.find(r => String(r.id) === String(rec.id));
+      if (disp) disp.code = to;
+      done++;
+      addLog('#00C16A', `✅ ${fullName(rec)}  ${from} → ${to}`);
+    } catch(e){
+      failed++;
+      addLog('#E63030', `❌ ${fullName(rec)}  ${from} — ${e.message}`);
+    }
+  }
+  fill.style.width = '100%';
+
+  // Only fold the team's own settings away once every member actually moved.
+  // Doing it after a partial failure would strand the people left behind in a
+  // team with no name and no leader.
+  if (!failed){
+    delete teamNames[src]; delete teamLeaders[src]; delete teamWhatsapp[src];
+    await idbSet('teamNames', teamNames);
+    await idbSet('teamLeaders', teamLeaders);
+    await idbSet('teamWhatsapp', teamWhatsapp);
+
+    if (fx.staffMoves.length || fx.staffDrops.length){
+      const dropIds = new Set(fx.staffDrops.map(a => a.id));
+      staffAssignments = staffAssignments.filter(a => !dropIds.has(a.id));
+      staffAssignments.forEach(a => { if (a.group === src) a.group = dst; });
+      await persistStaff();
+      addLog('#7C5CFF', `↪ ${fx.staffMoves.length} staff assignment(s) moved, ${fx.staffDrops.length} dropped`);
+    }
+    if (typeof staffCloudSave === 'function') staffCloudSave();
+  } else {
+    addLog('#FF6B00', '⚠ Team name, leader and WhatsApp link kept, because some members did not move.');
+  }
+
+  buildCodeFilter();
+  applyFilters();
+  updateTeamsBadge();
+  renderTeams();
+
+  status.style.color = failed ? 'var(--orange)' : 'var(--green)';
+  status.textContent = `✅ ${done} MOVED${failed ? `, ${failed} FAILED` : ''}`;
+  toast(failed ? `MERGED ${done}, ${failed} FAILED` : `${src} MERGED INTO ${dst}`, failed ? 'err' : 'ok');
+
+  go.disabled = false;
+  go.textContent = 'CLOSE';
+  go.className = 'nb nb-ghost';
+  go.onclick = closeMergeModal;
+}
+
 function startTeamRename(el) {
   if (el.querySelector('input')) return;
   const code = el.dataset.code;
@@ -8764,6 +9040,7 @@ function cmdkActions(){
     { ic:'📄', tx:'Export filtered list to PDF',   sub:'ACTION', run:exportPDF },
     { ic:'🪪', tx:'Print ID cards',                sub:'ACTION', run:printIdCards },
     { ic:'📇', tx:'Save to contacts (code + name)', sub:'ACTION', run:openContacts },
+    { ic:'⇄', tx:'Merge two teams',             sub:'ACTION', run:openMergeModal },
     { ic:'🆕', tx:'Show newest registrations first', sub:'ACTION', run:showNewestFirst },
     { ic:'◐',  tx:'Switch theme',                  sub:'ACTION', run:cycleTheme },
     { ic:'▤',  tx:'Toggle compact rows',           sub:'ACTION', run:toggleDensity },
