@@ -3704,6 +3704,17 @@ function diagnoseConnection(e){
     why: 'Postgres says the table <code>'+escHtml(TABLE)+'</code> does not exist.',
     fix: ['Check the name in the config bar against the Table Editor.']
   };
+  // Postgres' own "no privilege" code. Seen by a signed-out page against a
+  // database that has already been locked down — which is this app's own
+  // upgrade order if the SQL is run before the new build is live.
+  if (pg === '42501') return {
+    title: 'THIS BUILD CANNOT SIGN IN',
+    why: 'The database has been locked to signed-in users, and the page is still '
+       + 'using the anonymous key. Postgres refused it, which is exactly what it should do.',
+    fix: ['Reload the page with a hard refresh (Ctrl+Shift+R) — an older copy of the '
+          + 'app may be cached.',
+          'Check the account exists under Authentication → Users, with its email confirmed.']
+  };
   if (pg === '42703' || pg === 'PGRST100' || pg === 'PGRST204') return {
     title: 'A COLUMN THE APP NEEDS IS MISSING',
     why: 'The table exists, but Postgres rejected the query over a column: <code>'
