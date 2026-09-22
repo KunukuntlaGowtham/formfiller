@@ -2027,6 +2027,9 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
     <button class="tab-btn" data-tab="month" onclick="switchTab('month')">
       Month
     </button>
+    <button class="tab-btn" data-tab="ttd" onclick="switchTab('ttd')">
+      TTD <span class="tab-count" id="tc-ttd">0</span>
+    </button>
     <button class="tab-btn" data-tab="checker" onclick="switchTab('checker')">
       Checker <span class="tab-count issues" id="tc-issues">0</span>
     </button>
@@ -2554,6 +2557,66 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
 </div>
 
 <!-- ═══════════════════ PAGE: TEAMS ═══════════════════ -->
+<!-- ═══════════════════ PAGE: TTD BOOKINGS ═══════════════════ -->
+<div class="page" id="pg-ttd">
+  <div class="chk-header">
+    <div>
+      <h2>TTD BOOKINGS</h2>
+      <p>The <strong>ttd_db</strong> table your Tampermonkey scripts read. One row per booking — the lead
+         pilgrim plus everyone travelling with them. The scripts can only read it; entering and editing
+         happens here.</p>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <div class="search-wrap" style="max-width:220px;">
+        <span class="ico" aria-hidden="true">⌕</span>
+        <input type="text" id="ttd-search" placeholder="Search code, name, mobile…" aria-label="Search bookings" />
+      </div>
+      <button class="nb nb-green" onclick="ttdNew()">✚ NEW BOOKING</button>
+      <button class="nb nb-blue" onclick="ttdLoad()">↻ REFRESH</button>
+    </div>
+  </div>
+  <div class="stats-strip" id="ttd-strip" style="display:none;"></div>
+  <div id="ttd-body"></div>
+</div>
+
+<!-- TTD BOOKING EDITOR -->
+<div class="overlay" id="ttd-overlay">
+  <div class="modal" style="max-width:760px;" role="dialog" aria-modal="true" aria-label="TTD booking">
+    <button class="btn-x" onclick="ttdClose()" title="Close" aria-label="Close">✕</button>
+    <div class="modal-title" id="ttd-title">NEW <span class="hi">BOOKING</span></div>
+
+    <div class="fld">
+      <label for="ttd-code">Booking code <span class="req">*</span></label>
+      <div style="display:flex;gap:8px;">
+        <input id="ttd-code" placeholder="e.g. KSS1" style="flex:1;" oninput="ttdCodeNote()" />
+        <button class="nb nb-ghost nb-sm" onclick="ttdPullFromRegistry()"
+                title="Fill the lead pilgrim from the registry record with this code">⇩ FROM REGISTRY</button>
+      </div>
+      <div id="ttd-code-note" style="font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.6;"></div>
+    </div>
+
+    <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1.6px;color:var(--muted);
+         margin:18px 0 8px;">LEAD PILGRIM</div>
+    <div id="ttd-lead"></div>
+
+    <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1.6px;color:var(--muted);
+         margin:18px 0 8px;display:flex;align-items:center;gap:10px;">
+      <span>TRAVELLING WITH</span>
+      <span id="ttd-party-count" style="color:var(--muted);letter-spacing:0;"></span>
+      <button class="nb nb-ghost nb-sm" style="margin-left:auto;" onclick="ttdAddPerson()">✚ ADD PERSON</button>
+    </div>
+    <div id="ttd-party"></div>
+
+    <div id="ttd-msg" style="font-family:'Space Mono',monospace;font-size:11px;min-height:18px;margin-top:12px;"></div>
+
+    <div class="modal-footer">
+      <button class="nb nb-red nb-sm" id="ttd-del" onclick="ttdDelete()" style="margin-right:auto;">🗑 DELETE</button>
+      <button class="nb nb-ghost" onclick="ttdClose()">CANCEL</button>
+      <button class="nb nb-green" id="ttd-save" onclick="ttdSave()">⬆ SAVE BOOKING</button>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="pg-teams">
   <div class="chk-header">
     <div>
@@ -3414,12 +3477,13 @@ function switchTab(tab) {
   const showSearch = tab==='list';
   document.getElementById('search-bar').style.display = showSearch?'':'none';
   document.getElementById('ai-drawer').classList.remove('open');
-  const pg = {list:'pg-list',detail:'pg-detail',register:'pg-register',checker:'pg-checker',month:'pg-month',teams:'pg-teams',staff:'pg-staff',fast:'pg-fast'}[tab];
+  const pg = {list:'pg-list',detail:'pg-detail',register:'pg-register',checker:'pg-checker',month:'pg-month',teams:'pg-teams',staff:'pg-staff',fast:'pg-fast',ttd:'pg-ttd'}[tab];
   if(pg) document.getElementById(pg).classList.add('active');
   if(tab==='month') renderMonth();
   if(tab==='teams') renderTeams();
   if(tab==='staff') renderStaff();
   if(tab==='fast') fastEnter();
+  if(tab==='ttd') ttdEnter();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -4322,6 +4386,7 @@ document.getElementById('form-overlay').onclick=e=>{if(e.target===e.currentTarge
 document.getElementById('del-overlay').onclick=e=>{if(e.target===e.currentTarget)closeDel();};
 document.getElementById('contacts-overlay').onclick=e=>{if(e.target===e.currentTarget)closeContacts();};
 document.getElementById('merge-overlay').onclick=e=>{if(e.target===e.currentTarget)closeMergeModal();};
+document.getElementById('ttd-overlay').onclick=e=>{if(e.target===e.currentTarget)ttdClose();};
 
 document.addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
@@ -7797,6 +7862,411 @@ document.getElementById('teams-body').addEventListener('click', e => {
 });
 
 // ════════════════════════════════════════════
+// TTD BOOKINGS  (the ttd_db table)
+// ════════════════════════════════════════════
+// The Tampermonkey scripts read this table with the anon key and cannot write
+// to it — that is enforced by the policies in supabase-ttd.sql, not here. So
+// this tab is the only way a booking gets created or changed.
+
+const TTD_TABLE = 'ttd_db';
+const TTD_MAX_PARTY = 8;          // lead + 7 others; the SQL creates p2…p8
+const TTD_ID_TYPES = ['Aadhaar Card', 'PAN Card', 'Voter ID', 'Driving License', 'Passport'];
+
+let ttdRows = [];
+let ttdEditId = null;             // null = a new booking
+let ttdParty = [];                // [{name, age, gender, idType, idNumber}, …]
+let ttdLoaded = false;
+
+function ttdEnter(){
+  if (!ttdLoaded) ttdLoad();
+  else ttdRender();
+}
+
+async function ttdLoad(){
+  const body = document.getElementById('ttd-body');
+  body.innerHTML = '<div class="chk-empty"><div class="big">LOADING…</div></div>';
+  try {
+    ttdRows = await supa(`${TTD_TABLE}?select=*&order=code.asc`);
+    ttdLoaded = true;
+    ttdRender();
+  } catch(e){
+    // A missing table is the ordinary first-run case, not a failure worth a
+    // stack trace — say which SQL file creates it.
+    const missing = e.status === 404 || e.pgCode === '42P01';
+    body.innerHTML = `<div class="chk-empty"><div class="big">${missing ? 'NO TTD_DB TABLE' : 'COULD NOT LOAD'}</div>
+      <p>${missing
+        ? 'Run <code>supabase-ttd.sql</code> in the Supabase SQL editor, then press REFRESH.'
+        : escHtml(e.message)}</p></div>`;
+    document.getElementById('ttd-strip').style.display = 'none';
+  }
+}
+
+// Everyone on a booking: the lead, then each pN column that carries a name.
+function ttdPartyOf(r){
+  const out = [];
+  for (let n = 2; n <= TTD_MAX_PARTY; n++){
+    const nm = r['p'+n+'_name'];
+    if (nm && String(nm).trim()) out.push({
+      name: String(nm).trim(),
+      age: r['p'+n+'_age'] || '', gender: r['p'+n+'_gender'] || '',
+      idType: r['p'+n+'_idtype'] || '', idNumber: r['p'+n+'_idnumber'] || ''
+    });
+  }
+  return out;
+}
+const ttdSize = r => 1 + ttdPartyOf(r).length;
+
+function ttdFiltered(){
+  const q = (document.getElementById('ttd-search')?.value || '').toLowerCase().trim();
+  if (!q) return ttdRows;
+  return ttdRows.filter(r => [r.code, r.sevakname, r.mobile, r.idnumber]
+    .concat(ttdPartyOf(r).map(x => x.name))
+    .some(v => String(v||'').toLowerCase().includes(q)));
+}
+
+function ttdRender(){
+  const body = document.getElementById('ttd-body');
+  const strip = document.getElementById('ttd-strip');
+  const badge = document.getElementById('tc-ttd');
+  if (badge) badge.textContent = ttdRows.length;
+
+  const people = ttdRows.reduce((a,r) => a + ttdSize(r), 0);
+  const groups = ttdRows.filter(r => ttdSize(r) > 1).length;
+  strip.style.display = ttdRows.length ? '' : 'none';
+  strip.innerHTML = `
+    <div class="stat c1"><div class="v">${ttdRows.length}</div><div class="l">BOOKINGS</div></div>
+    <div class="stat c2"><div class="v">${people}</div><div class="l">PEOPLE</div></div>
+    <div class="stat c3"><div class="v">${groups}</div><div class="l">WITH OTHERS</div></div>
+    <div class="stat c4"><div class="v">${ttdRows.length ? Math.round(people/ttdRows.length*10)/10 : 0}</div><div class="l">AVG SIZE</div></div>`;
+
+  const rows = ttdFiltered();
+  if (!rows.length){
+    body.innerHTML = ttdRows.length
+      ? '<div class="chk-empty"><div class="big">NO MATCH</div><p>NOTHING MATCHES THAT SEARCH</p></div>'
+      : '<div class="chk-empty"><div class="big">NO BOOKINGS YET</div><p>PRESS ✚ NEW BOOKING TO ADD THE FIRST ONE</p></div>';
+    return;
+  }
+
+  body.innerHTML = '<div class="team-grid">' + rows.map(r => {
+    const party = ttdPartyOf(r);
+    const n = 1 + party.length;
+    return `<div class="team-card" data-ttd="${escAttr(String(r.id))}" style="cursor:pointer;">
+      <div class="tm-top">
+        <div class="tm-name">${escHtml(r.sevakname || '—')}</div>
+        <span class="tm-code">${escHtml(r.code || 'NO CODE')}</span>
+      </div>
+      <div class="tm-meta" style="border-top:none;padding-top:0;">
+        <span><b>${n}</b> ${n === 1 ? 'person' : 'people'}</span>
+        ${r.mobile ? `<span>📞 ${escHtml(r.mobile)}</span>` : ''}
+        ${r.gender ? `<span>${escHtml(r.gender)}</span>` : ''}
+        ${r.age ? `<span>${escHtml(r.age)} yrs</span>` : ''}
+      </div>
+      ${party.length ? `<div style="font-size:12.5px;color:var(--muted);line-height:1.7;padding:0 2px 2px;">
+        with ${party.map(x => escHtml(x.name)).join(', ')}</div>` : ''}
+    </div>`;
+  }).join('') + '</div>';
+}
+
+document.getElementById('ttd-body').addEventListener('click', e => {
+  const card = e.target.closest('[data-ttd]');
+  if (card) ttdOpen(card.dataset.ttd);
+});
+document.getElementById('ttd-search').addEventListener('input', ttdRender);
+
+// ── the editor ───────────────────────────────────────────────────────────
+function ttdPersonFields(prefix, v, idx){
+  const gid = prefix + '-gender', tid = prefix + '-idtype';
+  return `
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">
+    <div class="fld"><label for="${prefix}-name">Name${idx ? '' : ' <span class="req">*</span>'}</label>
+      <input id="${prefix}-name" value="${escAttr(v.name||'')}" placeholder="Full name" /></div>
+    <div class="fld"><label for="${prefix}-age">Age</label>
+      <input id="${prefix}-age" value="${escAttr(v.age||'')}" inputmode="numeric" placeholder="e.g. 38" /></div>
+    <div class="fld"><label for="${gid}">Gender</label>
+      <select id="${gid}">
+        <option value="">—</option>
+        ${['Male','Female','Other'].map(g =>
+          `<option${String(v.gender||'').toLowerCase()===g.toLowerCase()?' selected':''}>${g}</option>`).join('')}
+      </select></div>
+    <div class="fld"><label for="${tid}">ID type</label>
+      <select id="${tid}">
+        ${TTD_ID_TYPES.map(t =>
+          `<option${(v.idType||'Aadhaar Card')===t?' selected':''}>${t}</option>`).join('')}
+      </select></div>
+    <div class="fld"><label for="${prefix}-idnumber">ID number</label>
+      <input id="${prefix}-idnumber" value="${escAttr(v.idNumber||'')}" placeholder="Aadhaar / PAN…" /></div>
+  </div>`;
+}
+
+function ttdRenderLead(v){
+  document.getElementById('ttd-lead').innerHTML =
+    ttdPersonFields('ttd-lead-f', v, 0) + `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">
+      <div class="fld"><label for="ttd-mobile">Mobile</label>
+        <input id="ttd-mobile" value="${escAttr(v.mobile||'')}" inputmode="numeric" placeholder="10 digits" /></div>
+      <div class="fld"><label for="ttd-email">Email</label>
+        <input id="ttd-email" value="${escAttr(v.email||'')}" placeholder="name@example.com" /></div>
+      <div class="fld"><label for="ttd-gothram">Gothram</label>
+        <input id="ttd-gothram" value="${escAttr(v.gothram||'')}" /></div>
+      <div class="fld"><label for="ttd-city">City</label>
+        <input id="ttd-city" value="${escAttr(v.city||'')}" /></div>
+      <div class="fld"><label for="ttd-state">State</label>
+        <input id="ttd-state" value="${escAttr(v.state||'')}" /></div>
+      <div class="fld"><label for="ttd-pincode">Pincode</label>
+        <input id="ttd-pincode" value="${escAttr(v.pincode||'')}" inputmode="numeric" maxlength="6" /></div>
+      <div class="fld"><label for="ttd-country">Country</label>
+        <input id="ttd-country" value="${escAttr(v.country||'India')}" /></div>
+    </div>`;
+}
+
+function ttdRenderParty(){
+  const box = document.getElementById('ttd-party');
+  const cnt = document.getElementById('ttd-party-count');
+  cnt.textContent = ttdParty.length
+    ? `${ttdParty.length + 1} people on this booking`
+    : 'just the lead pilgrim';
+
+  if (!ttdParty.length){
+    box.innerHTML = `<div style="padding:12px 14px;border-radius:12px;background:var(--surface-2);
+      border:1px solid var(--line);font-size:13px;color:var(--muted);">
+      Nobody else yet. Press ✚ ADD PERSON for each extra traveller.</div>`;
+    return;
+  }
+  box.innerHTML = ttdParty.map((v, i) => `
+    <div style="padding:12px 14px;border-radius:12px;background:var(--surface-2);
+         border:1px solid var(--line);margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <span style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1.4px;color:var(--muted);">
+          PERSON ${i + 2}</span>
+        <button class="nb nb-red nb-sm" style="margin-left:auto;" onclick="ttdRemovePerson(${i})">✕ REMOVE</button>
+      </div>
+      ${ttdPersonFields('ttd-p' + i, v, i + 1)}
+    </div>`).join('');
+}
+
+// Read whatever is on screen back into ttdParty, so adding or removing a row
+// never discards what was already typed into the others.
+function ttdCaptureParty(){
+  ttdParty = ttdParty.map((_, i) => ({
+    name:     (document.getElementById('ttd-p'+i+'-name')?.value || '').trim(),
+    age:      (document.getElementById('ttd-p'+i+'-age')?.value || '').trim(),
+    gender:    document.getElementById('ttd-p'+i+'-gender')?.value || '',
+    idType:    document.getElementById('ttd-p'+i+'-idtype')?.value || '',
+    idNumber: (document.getElementById('ttd-p'+i+'-idnumber')?.value || '').trim()
+  }));
+}
+
+function ttdAddPerson(){
+  ttdCaptureParty();
+  if (ttdParty.length + 1 >= TTD_MAX_PARTY){
+    ttdMsg(`A booking holds at most ${TTD_MAX_PARTY} people. Add p${TTD_MAX_PARTY+1} columns in Supabase to go further.`, 'warn');
+    return;
+  }
+  ttdParty.push({ name:'', age:'', gender:'', idType:'Aadhaar Card', idNumber:'' });
+  ttdRenderParty();
+  document.getElementById('ttd-p' + (ttdParty.length - 1) + '-name')?.focus();
+}
+
+function ttdRemovePerson(i){
+  ttdCaptureParty();
+  ttdParty.splice(i, 1);
+  ttdRenderParty();
+}
+
+function ttdMsg(text, tone){
+  const el = document.getElementById('ttd-msg');
+  if (!el) return;
+  el.textContent = text || '';
+  el.style.color = tone === 'ok' ? 'var(--green)' : tone === 'warn' ? 'var(--orange)' : 'var(--red)';
+}
+
+function ttdNew(){
+  ttdEditId = null;
+  ttdParty = [];
+  document.getElementById('ttd-title').innerHTML = 'NEW <span class="hi">BOOKING</span>';
+  document.getElementById('ttd-code').value = '';
+  document.getElementById('ttd-del').style.display = 'none';
+  ttdRenderLead({ country: 'India' });
+  ttdRenderParty();
+  ttdMsg('');
+  ttdCodeNote();
+  openOverlay('ttd-overlay');
+}
+
+function ttdOpen(id){
+  const r = ttdRows.find(x => String(x.id) === String(id));
+  if (!r) return;
+  ttdEditId = r.id;
+  ttdParty = ttdPartyOf(r);
+  document.getElementById('ttd-title').innerHTML = 'EDIT <span class="hi">' + escHtml(r.code || 'BOOKING') + '</span>';
+  document.getElementById('ttd-code').value = r.code || '';
+  document.getElementById('ttd-del').style.display = '';
+  ttdRenderLead({
+    name: r.sevakname, age: r.age, gender: r.gender, idType: r.idtype, idNumber: r.idnumber,
+    mobile: r.mobile, email: r.email, gothram: r.gothram,
+    city: r.city, state: r.state, pincode: r.pincode, country: r.country || 'India'
+  });
+  ttdRenderParty();
+  ttdMsg('');
+  ttdCodeNote();
+  openOverlay('ttd-overlay');
+}
+
+function ttdClose(){ closeOverlay('ttd-overlay'); }
+
+// The code is the join between this table and the registry, and it is unique
+// in ttd_db — say so before a save fails on it.
+function ttdCodeNote(){
+  const code = (document.getElementById('ttd-code')?.value || '').trim();
+  const note = document.getElementById('ttd-code-note');
+  if (!note) return;
+  if (!code){ note.textContent = 'The code your Tampermonkey team filter matches on, e.g. KSS1.'; note.style.color = 'var(--muted)'; return; }
+
+  const clash = ttdRows.find(r => String(r.code||'').trim().toUpperCase() === code.toUpperCase()
+                               && String(r.id) !== String(ttdEditId));
+  const inReg = (typeof allRecords !== 'undefined')
+    && allRecords.find(r => String(r.code||'').trim().toUpperCase() === code.toUpperCase());
+
+  if (clash){
+    note.innerHTML = '⚠ A booking with this code already exists — saving will be refused.';
+    note.style.color = 'var(--red)';
+  } else if (inReg){
+    note.innerHTML = '✓ Matches <strong>' + escHtml([inReg.sevakName, inReg.surName].filter(Boolean).join(' '))
+      + '</strong> in the registry — press ⇩ FROM REGISTRY to copy their details in.';
+    note.style.color = 'var(--green)';
+  } else {
+    note.textContent = 'No registry record with this code. That is fine — it just cannot be pre-filled.';
+    note.style.color = 'var(--muted)';
+  }
+}
+
+// The same people are already in the registry, so retyping them is wasted work.
+function ttdPullFromRegistry(){
+  const code = (document.getElementById('ttd-code').value || '').trim();
+  if (!code){ ttdMsg('Type the booking code first.', 'warn'); return; }
+  if (typeof allRecords === 'undefined' || !allRecords.length){
+    ttdMsg('The registry has not loaded yet.', 'warn'); return;
+  }
+  const rec = allRecords.find(r => String(r.code||'').trim().toUpperCase() === code.toUpperCase());
+  if (!rec){ ttdMsg('No registry record with the code ' + code + '.', 'warn'); return; }
+
+  ttdCaptureParty();
+  ttdRenderLead({
+    name: [rec.sevakName, rec.surName].filter(Boolean).join(' '),
+    age: (typeof ageFromDob === 'function' ? ageFromDob(rec.dob) : '') || '',
+    gender: normGender(rec.gender) || '',
+    idType: 'Aadhaar Card',
+    idNumber: rec.idNumber || '',
+    mobile: rec.mobileNo || '', email: rec.email || '', gothram: '',
+    city: rec.city || '', state: rec.state || '', pincode: rec.pincode || '', country: 'India'
+  });
+  ttdRenderParty();
+  ttdMsg('Filled from the registry — check it before saving.', 'ok');
+}
+
+// dd/mm/yyyy → years, used when pulling a registry record across.
+function ageFromDob(dob){
+  const m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/.exec(String(dob||'').trim());
+  if (!m) return '';
+  const b = new Date(+m[3], +m[2]-1, +m[1]);
+  if (isNaN(b.getTime())) return '';
+  const now = new Date();
+  let a = now.getFullYear() - b.getFullYear();
+  const md = now.getMonth() - b.getMonth();
+  if (md < 0 || (md === 0 && now.getDate() < b.getDate())) a--;
+  return (a >= 0 && a < 130) ? String(a) : '';
+}
+
+function ttdCollect(){
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  ttdCaptureParty();
+
+  const row = {
+    code:      g('ttd-code'),
+    sevakname: g('ttd-lead-f-name'),
+    age:       g('ttd-lead-f-age'),
+    gender:    document.getElementById('ttd-lead-f-gender')?.value || '',
+    idtype:    document.getElementById('ttd-lead-f-idtype')?.value || '',
+    idnumber:  g('ttd-lead-f-idnumber'),
+    mobile:    g('ttd-mobile'),
+    email:     g('ttd-email'),
+    gothram:   g('ttd-gothram'),
+    city:      g('ttd-city'),
+    state:     g('ttd-state'),
+    pincode:   g('ttd-pincode'),
+    country:   g('ttd-country') || 'India'
+  };
+
+  // Every slot is written, blank ones included. Without that, removing the
+  // fourth person would leave their name sitting in p4_name and the filler
+  // would keep entering them.
+  for (let n = 2; n <= TTD_MAX_PARTY; n++){
+    const v = ttdParty[n-2] || {};
+    row['p'+n+'_name']     = v.name || '';
+    row['p'+n+'_age']      = v.age || '';
+    row['p'+n+'_gender']   = v.gender || '';
+    row['p'+n+'_idtype']   = v.name ? (v.idType || 'Aadhaar Card') : '';
+    row['p'+n+'_idnumber'] = v.idNumber || '';
+  }
+  return row;
+}
+
+async function ttdSave(){
+  const row = ttdCollect();
+  if (!row.code){ ttdMsg('A booking code is required.', 'warn'); return; }
+  if (!row.sevakname){ ttdMsg('The lead pilgrim needs a name.', 'warn'); return; }
+
+  const gap = ttdParty.findIndex(x => !x.name);
+  if (gap !== -1 && ttdParty.slice(gap).some(x => x.name)){
+    ttdMsg(`Person ${gap+2} has no name — fill it in or remove that row.`, 'warn'); return;
+  }
+  ttdParty = ttdParty.filter(x => x.name);
+
+  const btn = document.getElementById('ttd-save');
+  btn.disabled = true; btn.textContent = 'SAVING…'; ttdMsg('');
+  try {
+    if (ttdEditId == null){
+      const rows = await supa(TTD_TABLE, { method:'POST', body: JSON.stringify(row) });
+      if (Array.isArray(rows) && rows[0]) ttdRows.push(rows[0]);
+      toast('BOOKING ' + row.code.toUpperCase() + ' ADDED', 'ok');
+    } else {
+      const rows = await supa(`${TTD_TABLE}?id=eq.${encodeURIComponent(String(ttdEditId))}`,
+                              { method:'PATCH', body: JSON.stringify(row) });
+      const i = ttdRows.findIndex(x => String(x.id) === String(ttdEditId));
+      if (i !== -1 && Array.isArray(rows) && rows[0]) ttdRows[i] = rows[0];
+      toast('BOOKING ' + row.code.toUpperCase() + ' UPDATED', 'ok');
+    }
+    ttdRows.sort((a,b) => String(a.code||'').localeCompare(String(b.code||''), undefined, {numeric:true}));
+    ttdRender();
+    ttdClose();
+  } catch(e){
+    // 23505 is the unique index on code — a far more useful thing to say than
+    // the raw constraint name Postgres hands back.
+    ttdMsg(/23505|duplicate key/i.test(e.message)
+      ? 'A booking with the code ' + row.code + ' already exists.'
+      : (e.status === 401 || e.status === 403
+          ? 'Not allowed — writing to ttd_db needs a signed-in user. Run supabase-ttd.sql.'
+          : e.message), 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '⬆ SAVE BOOKING';
+  }
+}
+
+async function ttdDelete(){
+  if (ttdEditId == null) return;
+  const r = ttdRows.find(x => String(x.id) === String(ttdEditId));
+  const n = r ? ttdSize(r) : 1;
+  if (!confirm(`Delete booking ${r && r.code ? r.code : ''} (${n} ${n===1?'person':'people'})?\n\nThis cannot be undone.`)) return;
+  try {
+    await supa(`${TTD_TABLE}?id=eq.${encodeURIComponent(String(ttdEditId))}`, { method:'DELETE' });
+    ttdRows = ttdRows.filter(x => String(x.id) !== String(ttdEditId));
+    ttdRender();
+    ttdClose();
+    toast('BOOKING DELETED', 'ok');
+  } catch(e){ ttdMsg(e.message, 'err'); }
+}
+
+// ════════════════════════════════════════════
 // MERGE TWO TEAMS
 // ════════════════════════════════════════════
 // A team is only ever the prefix of its members' codes, so merging is a
@@ -9337,6 +9807,8 @@ function cmdkActions(){
     { ic:'🪪', tx:'Print ID cards',                sub:'ACTION', run:printIdCards },
     { ic:'📇', tx:'Save to contacts (code + name)', sub:'ACTION', run:openContacts },
     { ic:'⇄', tx:'Merge two teams',             sub:'ACTION', run:openMergeModal },
+    { ic:'🛕', tx:'TTD bookings',                sub:'TAB',    run:() => switchTab('ttd') },
+    { ic:'✚', tx:'New TTD booking',             sub:'ACTION', run:() => { switchTab('ttd'); ttdNew(); } },
     { ic:'🆕', tx:'Show newest registrations first', sub:'ACTION', run:showNewestFirst },
     { ic:'◐',  tx:'Switch theme',                  sub:'ACTION', run:cycleTheme },
     { ic:'▤',  tx:'Toggle compact rows',           sub:'ACTION', run:toggleDensity },
