@@ -68,6 +68,16 @@ create table if not exists public.ttd_devices (
   seen_at    timestamptz not null default now()
 );
 
+-- Added after the first version: a name you choose, and the settings the
+-- device is actually holding, so a card shows what it will do rather than
+-- only who it is.
+alter table public.ttd_devices add column if not exists label   text;          -- "Ravi laptop"
+alter table public.ttd_devices add column if not exists dates   text;          -- dates it will try
+alter table public.ttd_devices add column if not exists tickets integer;
+alter table public.ttd_devices add column if not exists fire_at text;          -- next scheduled IST time
+alter table public.ttd_devices add column if not exists cfg_at  timestamptz;   -- when a push last landed
+alter table public.ttd_devices add column if not exists cfg_by  text;          -- who sent it
+
 create index if not exists ttd_devices_room_idx on public.ttd_devices (room, seen_at desc);
 
 alter table public.ttd_devices enable row level security;

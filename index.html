@@ -8013,7 +8013,7 @@ function ctlRender(){
   const who = document.getElementById('ctl-who');
   const keep = who.value;
   who.innerHTML = '<option value="">Every device on this room</option>' +
-    live.map(d => `<option value="${escAttr(d.device)}">${escHtml(d.device)}${d.team ? ' · ' + escHtml(d.team) : ''}</option>`).join('');
+    live.map(d => `<option value="${escAttr(d.device)}">${escHtml(d.label || d.device)}${d.team ? ' · ' + escHtml(d.team) : ''}</option>`).join('');
   if (keep && live.some(d => d.device === keep)) who.value = keep;
 
   if (!ctlDevices.length){
@@ -8023,27 +8023,56 @@ function ctlRender(){
     return;
   }
 
+  // Each card answers three questions: who is this, what is it set to do, and
+  // when did the control room last change it.
+  const chip = (label, value) => `<span style="display:inline-flex;gap:6px;align-items:baseline;">
+      <span style="font-size:11px;color:var(--muted);">${label}</span>
+      <strong style="font-size:12.5px;">${escHtml(value)}</strong></span>`;
+
   const card = d => {
     const age = ctlAge(d), on = ctlLive(d);
+    const name = d.label || d.device;
+    const named = !!d.label;
+    const cfgAge = d.cfg_at ? Math.round((Date.now() - new Date(d.cfg_at).getTime())/1000) : null;
+    const cfgWhen = cfgAge === null ? null
+      : cfgAge < 60 ? cfgAge + 's ago'
+      : cfgAge < 3600 ? Math.round(cfgAge/60) + 'm ago' : Math.round(cfgAge/3600) + 'h ago';
+
     return `<div style="padding:14px 16px;border-radius:14px;margin-bottom:10px;
          background:var(--surface-2);border:1px solid ${on ? 'var(--line)' : 'transparent'};
          opacity:${on ? 1 : .45};">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;
               background:${on ? (d.running ? 'var(--green)' : 'var(--blue)') : 'var(--muted)'};"></span>
-        <strong style="font-family:'Space Mono',monospace;font-size:13px;">${escHtml(d.device)}</strong>
+        <strong style="font-size:14px;">${escHtml(name)}</strong>
+        ${named ? `<span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">${escHtml(d.device)}</span>` : ''}
         ${d.running ? '<span class="tab-count" style="background:var(--green);color:#052e16;">RUNNING</span>' : ''}
         <span style="margin-left:auto;font-size:11.5px;color:var(--muted);font-family:'Space Mono',monospace;">
           ${on ? (age < 10 ? 'just now' : age + 's ago') : 'offline ' + (age > 3600 ? Math.round(age/3600)+'h' : Math.round(age/60)+'m')}</span>
       </div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:9px;font-size:12.5px;color:var(--muted);">
-        <span>team <strong style="color:var(--fg);">${escHtml(d.team || '—')}</strong></span>
-        <span>booking <strong style="color:var(--fg);">${escHtml(d.picked || '—')}</strong></span>
-        <span>on <strong style="color:var(--fg);">${escHtml(d.page || '—')}</strong></span>
+
+      <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;">
+        ${chip('team', d.team || '—')}
+        ${chip('booking', d.picked || '—')}
+        ${chip('on', d.page || '—')}
       </div>
-      ${d.service ? `<div style="margin-top:6px;font-size:12px;color:var(--muted);">will open ${escHtml(d.service)}</div>` : ''}
-      <div style="display:flex;gap:6px;margin-top:11px;">
+
+      <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:7px;padding-top:9px;
+                  border-top:1px solid var(--line);">
+        ${chip('opens', d.service || '—')}
+        ${chip('dates', d.dates || 'earliest open')}
+        ${chip('tickets', d.tickets == null ? '—' : d.tickets)}
+        ${chip('fires at', d.fire_at || 'not scheduled')}
+      </div>
+
+      <div style="margin-top:8px;font-size:11.5px;color:${cfgWhen ? 'var(--green)' : 'var(--muted)'};">
+        ${cfgWhen ? `✓ settings received ${cfgWhen}${d.cfg_by ? ' from ' + escHtml(d.cfg_by) : ''}`
+                  : 'no settings pushed to this one yet'}
+      </div>
+
+      <div style="display:flex;gap:6px;margin-top:11px;flex-wrap:wrap;">
         <button class="nb nb-ghost nb-sm" onclick="ctlOne('${escAttr(d.device)}')">🎯 SEND TO THIS ONE</button>
+        <button class="nb nb-ghost nb-sm" onclick="ctlRename('${escAttr(d.device)}','${escAttr(name)}')">🏷 RENAME</button>
         <button class="nb nb-red nb-sm" onclick="ctlCmd('stop','${escAttr(d.device)}')">■ STOP</button>
       </div>
     </div>`;
@@ -8054,9 +8083,22 @@ function ctlRender(){
          color:var(--muted);margin:16px 0 8px;">NOT REPORTING</div>` + gone.map(card).join('') : '');
 }
 
+// Naming happens on the device, but doing it for all of them from here is
+// what makes a row of laptops readable in the first place.
+async function ctlRename(device, current){
+  const name = prompt('Name for this session:', current === device ? '' : current);
+  if (name === null) return;
+  try {
+    await ctlPost({ cmd:'rename', payload:{ label: name.trim().slice(0,40) }, to_device: device });
+    ctlMsg('Renaming ' + device + ' to "' + name.trim() + '" — it applies within a second.', 'ok');
+    setTimeout(ctlRefresh, 1800);
+  } catch(e){ ctlMsg(e.message, 'err'); }
+}
+
 function ctlOne(device){
   document.getElementById('ctl-who').value = device;
-  ctlMsg('Sending to ' + device + ' only.', 'ok');
+  const d = ctlDevices.find(x => x.device === device);
+  ctlMsg('Sending to ' + ((d && d.label) || device) + ' only.', 'ok');
   document.getElementById('ctl-service').focus();
 }
 
