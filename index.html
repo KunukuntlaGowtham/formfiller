@@ -1887,6 +1887,62 @@ td { border: none; }
 }
 .fast-existing[data-dirty="1"] .fast-tag::after { content: ' · EDITED'; color: var(--orange); }
 
+/* ── sign in ───────────────────────────────────────────────────────────── */
+#auth-screen{ position:fixed; inset:0; z-index:9999; display:flex;
+  align-items:center; justify-content:center; padding:20px;
+  background:linear-gradient(145deg,#efeaff 0%,#e4ddfb 45%,#f6f2ff 100%); }
+body:not(.signed-out) #auth-screen{ display:none; }
+body.signed-out{ overflow:hidden; }
+body.signed-out > *:not(#auth-screen){ filter:blur(9px); pointer-events:none; user-select:none; }
+.auth-card{ width:100%; max-width:380px; padding:34px 30px 26px; border-radius:22px;
+  background:rgba(255,255,255,.62); backdrop-filter:blur(22px) saturate(150%);
+  -webkit-backdrop-filter:blur(22px) saturate(150%);
+  border:1px solid rgba(255,255,255,.75); box-shadow:0 22px 60px rgba(76,52,142,.22);
+  text-align:center; }
+.auth-mark{ width:58px; height:58px; margin:0 auto 16px; border-radius:17px;
+  display:flex; align-items:center; justify-content:center; font-size:27px;
+  background:linear-gradient(140deg,#8b6cf0,#b79bff); color:#fff;
+  box-shadow:0 10px 24px rgba(124,92,240,.4); }
+.auth-card h1{ font-family:'Bebas Neue',Impact,sans-serif; font-size:31px; letter-spacing:2.6px;
+  color:#3b2d63; margin:0 0 5px; line-height:1.1; }
+.auth-sub{ font-size:13px; color:#6d6390; margin:0 0 20px; }
+#auth-form{ display:flex; flex-direction:column; gap:10px; }
+#auth-form input{ width:100%; padding:13px 15px; border-radius:12px; font-size:15px;
+  border:1px solid rgba(124,92,240,.3); background:rgba(255,255,255,.9); color:#2f2551;
+  outline:none; transition:border-color .15s, box-shadow .15s; }
+#auth-form input:focus{ border-color:#8b6cf0; box-shadow:0 0 0 3px rgba(139,108,240,.18); }
+#auth-form input.bad{ border-color:#e63030; animation:auth-shake .32s; }
+@keyframes auth-shake{ 0%,100%{transform:translateX(0)} 25%{transform:translateX(-7px)}
+  75%{transform:translateX(7px)} }
+#auth-go{ width:100%; justify-content:center; }
+#auth-go[disabled]{ opacity:.6; cursor:progress; }
+.auth-remember{ display:flex; align-items:center; gap:8px; margin-top:14px;
+  font-size:12.5px; color:#6d6390; cursor:pointer; text-align:left; }
+#auth-msg{ min-height:19px; margin-top:11px; font-family:'Space Mono',monospace;
+  font-size:11.5px; color:#e63030; line-height:1.55; }
+#btn-signout{ display:none; }
+body:not(.signed-out) #btn-signout{ display:inline-flex; }
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) #auth-screen{
+    background:linear-gradient(145deg,#1b1630 0%,#221b3d 45%,#171327 100%); }
+  :root:not([data-theme="light"]) .auth-card{ background:rgba(40,33,66,.66);
+    border-color:rgba(255,255,255,.12); box-shadow:0 22px 60px rgba(0,0,0,.5); }
+  :root:not([data-theme="light"]) .auth-card h1{ color:#ece7ff; }
+  :root:not([data-theme="light"]) .auth-sub,
+  :root:not([data-theme="light"]) .auth-remember{ color:#a79fc8; }
+  :root:not([data-theme="light"]) #auth-form input{ background:rgba(20,16,36,.8);
+    color:#ece7ff; border-color:rgba(255,255,255,.16); }
+}
+:root[data-theme="dark"] #auth-screen{
+  background:linear-gradient(145deg,#1b1630 0%,#221b3d 45%,#171327 100%); }
+:root[data-theme="dark"] .auth-card{ background:rgba(40,33,66,.66);
+  border-color:rgba(255,255,255,.12); box-shadow:0 22px 60px rgba(0,0,0,.5); }
+:root[data-theme="dark"] .auth-card h1{ color:#ece7ff; }
+:root[data-theme="dark"] .auth-sub,
+:root[data-theme="dark"] .auth-remember{ color:#a79fc8; }
+:root[data-theme="dark"] #auth-form input{ background:rgba(20,16,36,.8); color:#ece7ff;
+  border-color:rgba(255,255,255,.16); }
+
 /* ── connection diagnosis banner ───────────────────────────────────────── */
 #conn-diag{ margin:10px 16px 0; border-radius:14px; overflow:hidden;
   border:1px solid rgba(255,107,0,.45); background:var(--surface-2);
@@ -1906,7 +1962,31 @@ td { border: none; }
 @media (max-width:640px){ #conn-diag{ margin:10px 12px 0; } #conn-diag .cd-body{ font-size:12.5px; } }
 </style>
 </head>
-<body>
+<body class="signed-out">
+
+<!-- ═══ SIGN IN ═══
+     Sits above everything until Supabase issues a session. The app does not
+     query the registry until it has one, so a signed-out page holds no data
+     to be read out of. -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-mark" aria-hidden="true">⚡</div>
+    <h1>SEVAK REGISTRY</h1>
+    <p class="auth-sub">Sign in to continue.</p>
+    <form id="auth-form" autocomplete="on">
+      <input id="auth-email" type="email" placeholder="Email" aria-label="Email"
+             autocomplete="username" required />
+      <input id="auth-pass" type="password" placeholder="Password" aria-label="Password"
+             autocomplete="current-password" required />
+      <button class="nb nb-black" type="submit" id="auth-go">SIGN IN</button>
+    </form>
+    <label class="auth-remember">
+      <input type="checkbox" id="auth-remember" checked />
+      <span>Stay signed in on this device</span>
+    </label>
+    <div id="auth-msg" role="alert" aria-live="polite"></div>
+  </div>
+</div>
 
 <!-- ═══ CONFIG BAR ═══ -->
 <div id="cfg-bar" class="hidden">
@@ -1954,6 +2034,10 @@ td { border: none; }
   <div class="nav-right">
     <button class="nav-ico" onclick="toggleCfgBar()" id="btn-cfg"
             title="Connection settings">⚙<span class="conn-dot" id="conn-dot"></span></button>
+    <span id="hdr-who" style="font-size:11px;color:var(--muted);max-width:150px;
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+    <button class="nb nb-ghost nb-sm" id="btn-signout" onclick="signOut()"
+            title="Sign out of this device">Sign out</button>
     <button class="nb nb-ghost nb-sm" onclick="openCmdk()" title="Command palette (Ctrl+K)">Search</button>
     <button class="nb nb-ghost nb-sm" id="btn-theme" onclick="cycleTheme()" title="Light / dark / follow system">◐</button>
     <button class="nb nb-ghost nb-sm" onclick="openTrash()" title="Recently deleted records">Bin<span id="trash-count" style="display:none;">0</span></button>
@@ -3345,11 +3429,193 @@ function switchTab(tab) {
 // ════════════════════════════════════════════
 // SUPABASE
 // ════════════════════════════════════════════
+// ════════════════════════════════════════════
+// SUPABASE AUTH
+// ════════════════════════════════════════════
+// The anon key is in this file and always will be — the browser has to have it
+// to reach Supabase at all. It is meant to be public. What protects the
+// registry is that every policy now requires a signed-in user, so the key on
+// its own opens nothing. That is enforced by Postgres, not by this page, which
+// is why it holds even for someone reading the source.
+
+const AUTH_KEY = 'sevak_session';
+let sbSession = null;           // { access_token, refresh_token, expires_at }
+let authRefreshing = null;      // in-flight refresh, so parallel calls share one
+
+function authStore(sess, persist){
+  sbSession = sess;
+  try {
+    if (!sess) { localStorage.removeItem(AUTH_KEY); sessionStorage.removeItem(AUTH_KEY); return; }
+    const box = persist === false ? sessionStorage : localStorage;
+    box.setItem(AUTH_KEY, JSON.stringify(sess));
+  } catch(_){ /* private mode — the session simply lasts as long as the tab */ }
+}
+function authRestore(){
+  try {
+    const raw = localStorage.getItem(AUTH_KEY) || sessionStorage.getItem(AUTH_KEY);
+    if (raw) sbSession = JSON.parse(raw);
+  } catch(_){ sbSession = null; }
+  return sbSession;
+}
+function authPersisted(){
+  try { return !!localStorage.getItem(AUTH_KEY); } catch(_){ return false; }
+}
+
+function sessionFrom(json){
+  return {
+    access_token:  json.access_token,
+    refresh_token: json.refresh_token,
+    // A minute of slack, so a token never expires mid-request.
+    expires_at:    Date.now() + ((json.expires_in || 3600) - 60) * 1000,
+    email:         json.user && json.user.email || ''
+  };
+}
+
+async function authPost(grant, body){
+  const res = await fetch(SB_URL + '/auth/v1/token?grant_type=' + grant, {
+    method: 'POST',
+    headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const text = await res.text();
+  let json = null; try { json = JSON.parse(text); } catch(_){}
+  if (!res.ok){
+    const e = new Error((json && (json.error_description || json.msg || json.message)) || text || ('HTTP '+res.status));
+    e.status = res.status;
+    throw e;
+  }
+  return json;
+}
+
+async function authSignIn(email, password, persist){
+  const json = await authPost('password', { email, password });
+  authStore(sessionFrom(json), persist);
+  return sbSession;
+}
+
+// One refresh at a time. Without this guard a page that fires several requests
+// at once would send the refresh token several times; Supabase rotates it, so
+// every call after the first would fail with an already-used token and sign
+// the operator out in the middle of their work.
+function authRefresh(){
+  if (authRefreshing) return authRefreshing;
+  if (!sbSession || !sbSession.refresh_token) return Promise.resolve(null);
+  const persist = authPersisted();
+  authRefreshing = authPost('refresh_token', { refresh_token: sbSession.refresh_token })
+    .then(json => { authStore(sessionFrom(json), persist); return sbSession; })
+    .catch(err => { forceSignedOut(); throw err; })
+    .finally(() => { authRefreshing = null; });
+  return authRefreshing;
+}
+
+// The bearer token for a request, refreshed first if it is about to expire.
+async function authToken(){
+  if (!sbSession) return null;
+  if (Date.now() >= (sbSession.expires_at || 0)){
+    try { await authRefresh(); } catch(_){ return null; }
+  }
+  return sbSession && sbSession.access_token || null;
+}
+
+function authSignedIn(){ return !!(sbSession && sbSession.access_token); }
+
+// Whenever a session stops being usable — expired past refreshing, or a
+// refresh token Supabase has already rotated away — the page has to go back
+// to the sign-in screen. Wiping the session without this left the operator
+// looking at a stale registry they could no longer save to.
+function forceSignedOut(why){
+  authStore(null);
+  document.body.classList.add('signed-out');
+  const msg = document.getElementById('auth-msg');
+  if (msg) msg.textContent = why || 'Your session expired. Sign in again.';
+  const pass = document.getElementById('auth-pass');
+  if (pass) pass.value = '';
+  hideConnDiag();
+}
+
+async function signOut(){
+  const tok = sbSession && sbSession.access_token;
+  authStore(null);
+  allRecords = []; displayRecords = [];
+  selectedIds = new Set();
+  try { applyFilters(); } catch(_){}
+  // The counters are painted from their own state, so clearing the records
+  // alone left the header still advertising how many people are in there.
+  ['tc-records','tc-teams','tc-staff'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = '0';
+  });
+  try { updateStats(); } catch(_){}
+  document.body.classList.add('signed-out');
+  document.getElementById('auth-pass').value = '';
+  document.getElementById('auth-msg').textContent = '';
+  hideConnDiag();
+  // Best effort — the local session is already gone either way.
+  if (tok) fetch(SB_URL + '/auth/v1/logout', {
+    method:'POST', headers:{ 'apikey': SB_KEY, 'Authorization': 'Bearer ' + tok }
+  }).catch(()=>{});
+}
+
+// ── the sign-in screen ───────────────────────────────────────────────────
+function authError(e){
+  const m = String(e && e.message || '');
+  if (e && e.status === 400) return 'Wrong email or password.';
+  if (/Email not confirmed/i.test(m)) return 'That account has not confirmed its email yet. Confirm it in Supabase → Authentication → Users.';
+  if (e && e.status === 429) return 'Too many attempts. Wait a minute and try again.';
+  if (e && e.status === 0)   return 'Could not reach Supabase. Check the connection, or whether the project is paused.';
+  return m || 'Sign in failed.';
+}
+
+async function doSignIn(ev){
+  if (ev) ev.preventDefault();
+  const emailEl = document.getElementById('auth-email');
+  const passEl  = document.getElementById('auth-pass');
+  const msg     = document.getElementById('auth-msg');
+  const go      = document.getElementById('auth-go');
+  const email = emailEl.value.trim(), pass = passEl.value;
+  if (!email || !pass){ msg.textContent = 'Enter both the email and the password.'; return; }
+
+  go.disabled = true; go.textContent = 'SIGNING IN…'; msg.textContent = '';
+  emailEl.classList.remove('bad'); passEl.classList.remove('bad');
+  try {
+    await authSignIn(email, pass, document.getElementById('auth-remember').checked);
+    await enterApp();
+  } catch(e){
+    // A network failure reaches fetch as a TypeError with no status.
+    if (e && e.status === undefined) e.status = 0;
+    msg.textContent = authError(e);
+    passEl.classList.add('bad'); passEl.select();
+  } finally {
+    go.disabled = false; go.textContent = 'SIGN IN';
+  }
+}
+
+// Everything that must wait for a session: the app never asks Supabase for a
+// single row before this runs.
+async function enterApp(){
+  document.body.classList.remove('signed-out');
+  const who = document.getElementById('hdr-who');
+  if (who) who.textContent = (sbSession && sbSession.email) || '';
+  await connect();
+}
+
+async function bootAuth(){
+  authRestore();
+  if (!authSignedIn()){ document.body.classList.add('signed-out'); return; }
+  // A stored session may have gone stale while the tab was closed.
+  try { if (Date.now() >= (sbSession.expires_at || 0)) await authRefresh(); }
+  catch(_){ document.body.classList.add('signed-out'); return; }
+  if (authSignedIn()) await enterApp();
+  else document.body.classList.add('signed-out');
+}
+
 async function supa(path, opts={}) {
   const url = SB_URL+'/rest/v1/'+path;
+  // The bearer token is the signed-in user's, not the anon key. That is what
+  // the policies check; sending the anon key here would be rejected by them.
+  const token = await authToken();
   const h = {
     'apikey': SB_KEY,
-    'Authorization': 'Bearer '+SB_KEY,
+    'Authorization': 'Bearer '+(token || SB_KEY),
     'Content-Type': 'application/json',
     ...(opts.headers||{})
   };
@@ -3366,6 +3632,20 @@ async function supa(path, opts={}) {
     const e = new Error('The browser could not reach '+SB_URL+' at all.');
     e.status = 0; e.kind = 'network'; e.cause = netErr;
     throw e;
+  }
+  // A token can expire between two requests on a long-open tab. Refresh once
+  // and retry before treating it as a refusal, so a day's work is not
+  // interrupted by an hourly sign-in.
+  if (res.status === 401){
+    if (token && !opts._retried){
+      try {
+        await authRefresh();
+        return await supa(path, {...opts, _retried:true});
+      } catch(_){ /* falls through to the sign-out below */ }
+    }
+    forceSignedOut();
+    const e = new Error('Your session expired. Sign in again.');
+    e.status = 401; throw e;
   }
   if(!res.ok){
     const raw = await res.text();
@@ -3399,14 +3679,18 @@ function diagnoseConnection(e){
           + 'of no traffic and has to be resumed from the dashboard.',
           'Check the URL is the Project URL from Settings → API, and starts with <code>https://</code>.']
   };
-  if (status === 401 || status === 403) return {
-    title: 'SUPABASE REFUSED THE KEY',
-    why: 'The database answered, but rejected the anon key — so the key is wrong, has been '
-       + 'rotated, or the request never got past Row Level Security.',
-    fix: ['Settings → API → copy the <strong>anon public</strong> key again '
-          + '(the <code>service_role</code> key will not work from a browser).',
-          'If the key is right, the table has Row Level Security on with no policy attached. '
-          + 'Run <code>supabase-setup.sql</code> in the SQL editor.']
+  if (status === 401) return {
+    title: 'SIGNED OUT',
+    why: 'Supabase no longer accepts this session.',
+    fix: ['Sign in again.']
+  };
+  if (status === 403) return {
+    title: 'SIGNED IN, BUT NOT ALLOWED',
+    why: 'Supabase accepted the sign-in but refused the request, so the policies on '
+       + '<code>'+escHtml(TABLE)+'</code> do not let this account through.',
+    fix: ['Run <code>supabase-auth.sql</code> in the SQL editor — it grants access to any '
+          + 'signed-in user.',
+          'Check the account exists under Authentication → Users and its email is confirmed.']
   };
   if (status === 404) return {
     title: 'NO SUCH TABLE: ' + escHtml(TABLE).toUpperCase(),
@@ -3419,6 +3703,17 @@ function diagnoseConnection(e){
     title: 'NO SUCH TABLE: ' + escHtml(TABLE).toUpperCase(),
     why: 'Postgres says the table <code>'+escHtml(TABLE)+'</code> does not exist.',
     fix: ['Check the name in the config bar against the Table Editor.']
+  };
+  // Postgres' own "no privilege" code. Seen by a signed-out page against a
+  // database that has already been locked down — which is this app's own
+  // upgrade order if the SQL is run before the new build is live.
+  if (pg === '42501') return {
+    title: 'THIS BUILD CANNOT SIGN IN',
+    why: 'The database has been locked to signed-in users, and the page is still '
+       + 'using the anonymous key. Postgres refused it, which is exactly what it should do.',
+    fix: ['Reload the page with a hard refresh (Ctrl+Shift+R) — an older copy of the '
+          + 'app may be cached.',
+          'Check the account exists under Authentication → Users, with its email confirmed.']
   };
   if (pg === '42703' || pg === 'PGRST100' || pg === 'PGRST204') return {
     title: 'A COLUMN THE APP NEEDS IS MISSING',
@@ -3554,7 +3849,8 @@ async function connect() {
            + 'but it returned no rows. If you know there are people in it, they are being '
            + 'hidden rather than missing: Row Level Security with no policy attached returns '
            + 'an empty list instead of an error.',
-        fix: ['Run <code>supabase-setup.sql</code> in the Supabase SQL editor, then press TRY AGAIN.',
+        fix: ['Run <code>supabase-auth.sql</code> in the Supabase SQL editor, then press TRY AGAIN. '
+              + 'A policy that only allows the <code>anon</code> role hides every row from a signed-in one.',
               'If the table really is empty, this message is correct — register someone and it goes away.']
       });
       toast('CONNECTED BUT 0 ROWS','err');
@@ -9166,14 +9462,13 @@ document.addEventListener('keydown', e => {
 // ════════════════════════════════════════════
 loadTheme();
 loadDensity();
-// The connection is baked into the config bar above. Connect on load so the
-// registry is there when the page opens; the fields stay editable for anyone
-// who needs to point at a different project or table.
-(function autoConnect(){
-  const url = document.getElementById('cfg-url')?.value.trim();
-  const key = document.getElementById('cfg-key')?.value.trim();
-  if (url && key) connect();
-})();
+// Nothing is fetched until Supabase has issued a session. bootAuth() either
+// restores one and connects, or leaves the sign-in screen up; the config bar
+// stays editable for anyone pointing at a different project or table.
+SB_URL = document.getElementById('cfg-url')?.value.trim().replace(/\/+$/,'') || '';
+SB_KEY = document.getElementById('cfg-key')?.value.trim() || '';
+document.getElementById('auth-form').addEventListener('submit', doSignIn);
+bootAuth();
 populateStateSelects();   // the dropdown must work before anyone connects
 loadGeo();
 switchTab('list');
