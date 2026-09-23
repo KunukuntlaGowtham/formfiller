@@ -2565,9 +2565,9 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
   <div class="chk-header">
     <div>
       <h2>CONTROL ROOM</h2>
-      <p>Every browser running the TTD script that is set to <strong>all devices</strong> and on this room
-         reports in here. Push the service, the dates, the ticket count, who to book and the time to fire —
-         to all of them, or to one.</p>
+      <p>Every browser running the TTD script set to <strong>all devices</strong> on this room appears here,
+         each with its own panel. Fill one in to change that laptop alone, or use the panel at the top to
+         set them all at once.</p>
     </div>
     <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       <div class="fld" style="margin:0;min-width:140px;">
@@ -2579,54 +2579,23 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
   </div>
   <div class="stats-strip" id="ctl-strip" style="display:none;"></div>
 
-  <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:18px;
-              align-items:start;padding:0 16px 20px;">
-    <div id="ctl-devices"></div>
-
-    <div style="padding:16px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line);
-                position:sticky;top:16px;">
-      <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1.6px;color:var(--muted);
-           margin-bottom:12px;">PUSH SETTINGS</div>
-
-      <div class="fld"><label for="ctl-service">Service to open</label>
-        <select id="ctl-service"></select></div>
-
-      <div class="fld"><label for="ctl-dates">Dates to try</label>
-        <input id="ctl-dates" placeholder="2026-10-02, 03/10/2026" />
-        <div style="font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.6;">
-          Tried in the order listed. Leave empty to let each device pick the earliest open date.</div></div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="fld"><label for="ctl-tickets">Tickets</label>
-          <input id="ctl-tickets" type="number" min="1" max="20" value="2" /></div>
-        <div class="fld"><label for="ctl-time">Fire at (IST)</label>
-          <input id="ctl-time" type="time" step="1" /></div>
+  <div style="padding:0 16px 24px;">
+    <!-- everyone at once -->
+    <div id="ctl-all" style="padding:16px 18px;border-radius:16px;margin-bottom:22px;
+         background:linear-gradient(135deg,rgba(124,92,240,.1),rgba(124,92,240,.04));
+         border:1px solid rgba(124,92,240,.3);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <span style="font-family:'Space Mono',monospace;font-size:11px;letter-spacing:1.8px;">📡 ALL DEVICES</span>
+        <span id="ctl-all-count" style="font-size:12px;color:var(--muted);"></span>
+        <span style="margin-left:auto;font-size:11.5px;color:var(--muted);">
+          Empty fields are left alone on every device.</span>
       </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="fld"><label for="ctl-team">Team</label>
-          <input id="ctl-team" placeholder="e.g. KSS" spellcheck="false" /></div>
-        <div class="fld"><label for="ctl-code">Book this code</label>
-          <input id="ctl-code" placeholder="e.g. KSS3" spellcheck="false" list="ctl-codes" />
-          <datalist id="ctl-codes"></datalist></div>
-      </div>
-
-      <div style="font-size:11.5px;color:var(--muted);line-height:1.6;margin:-4px 0 12px;">
-        Leave a field empty and that device keeps what it already has.</div>
-
-      <div class="fld"><label for="ctl-who">Send to</label>
-        <select id="ctl-who"><option value="">Every device on this room</option></select></div>
-
-      <button class="nb nb-green" style="width:100%;" onclick="ctlPush()">⬆ PUSH SETTINGS</button>
-      <div style="display:flex;gap:8px;margin-top:8px;">
-        <button class="nb nb-purple nb-sm" style="flex:1;" onclick="ctlCmd('open')">⚡ OPEN NOW</button>
-        <button class="nb nb-ghost nb-sm" style="flex:1;" onclick="ctlCmd('start')">▶ START</button>
-        <button class="nb nb-red nb-sm" style="flex:1;" onclick="ctlCmd('stop')">■ STOP</button>
-      </div>
-
-      <div id="ctl-msg" style="font-family:'Space Mono',monospace;font-size:11px;min-height:34px;
-           margin-top:12px;line-height:1.6;"></div>
+      <div id="ctl-all-form"></div>
     </div>
+
+    <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1.8px;color:var(--muted);
+         margin:0 0 12px;">EACH LAPTOP</div>
+    <div id="ctl-devices"></div>
   </div>
 </div>
 
@@ -7939,8 +7908,8 @@ document.getElementById('teams-body').addEventListener('click', e => {
 // CONTROL ROOM  (ttd_devices + ttd_commands)
 // ════════════════════════════════════════════
 // Every browser running the TTD userscript in "all devices" mode reports in
-// every few seconds. This tab lists them and posts commands back. The script
-// polls for commands about once a second, so a push lands almost at once.
+// every few seconds. Each gets a panel of its own, and one panel above them
+// sets them all at once.
 
 const CTL_DEV = 'ttd_devices', CTL_CMD = 'ttd_commands';
 const CTL_SERVICES = [
@@ -7949,27 +7918,28 @@ const CTL_SERVICES = [
   'Special Entry Darshan (Ammavari Temple)', 'Arjitha Sevas',
   'Online Sevas (Virtual Participation)', 'Accommodation'
 ];
-// A device that has not reported in this long is treated as gone.
-const CTL_STALE_MS = 25000;
+const CTL_STALE_MS = 25000;        // silent this long → shown as offline
 
 let ctlDevices = [], ctlTimer = null, ctlStarted = false;
 
 const ctlRoom = () => (document.getElementById('ctl-room')?.value || 'default').trim() || 'default';
+const ctlAge  = d => Math.round((Date.now() - new Date(d.seen_at).getTime()) / 1000);
+const ctlLive = d => ctlAge(d) * 1000 < CTL_STALE_MS;
+// A device id is safe in an id attribute, but never assume it.
+const ctlKey  = dev => 'dv-' + String(dev).replace(/[^A-Za-z0-9_-]/g, '');
 
 function ctlEnter(){
   if (!ctlStarted){
     ctlStarted = true;
-    document.getElementById('ctl-service').innerHTML =
-      '<option value="">— leave as it is —</option>' +
-      CTL_SERVICES.map(x => `<option>${escHtml(x)}</option>`).join('');
     try { document.getElementById('ctl-room').value = localStorage.getItem('ttdCtlRoom') || 'default'; } catch(_){}
     document.getElementById('ctl-room').addEventListener('change', e => {
       try { localStorage.setItem('ttdCtlRoom', e.target.value.trim() || 'default'); } catch(_){}
+      document.getElementById('ctl-devices').innerHTML = '';   // different room, different laptops
       ctlRefresh();
     });
+    document.getElementById('ctl-all-form').innerHTML = ctlFormHtml('all');
   }
   ctlRefresh();
-  // Poll only while this tab is on screen — no point asking when nobody looks.
   clearInterval(ctlTimer);
   ctlTimer = setInterval(() => {
     if (document.getElementById('pg-control').classList.contains('active') && !document.hidden) ctlRefresh(true);
@@ -7990,11 +7960,52 @@ async function ctlRefresh(quiet){
   }
 }
 
-const ctlAge = d => Math.round((Date.now() - new Date(d.seen_at).getTime()) / 1000);
-const ctlLive = d => ctlAge(d) * 1000 < CTL_STALE_MS;
+// ── one form, used for the common panel and for every device ──────────────
+function ctlFormHtml(key){
+  const id = n => `ctl-${key}-${n}`;
+  return `
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">
+    <div class="fld" style="margin:0;"><label for="${id('service')}">Service</label>
+      <select id="${id('service')}">
+        <option value="">— unchanged —</option>
+        ${CTL_SERVICES.map(x => `<option>${escHtml(x)}</option>`).join('')}
+      </select></div>
+    <div class="fld" style="margin:0;"><label for="${id('dates')}">Dates to try</label>
+      <input id="${id('dates')}" placeholder="2026-10-02, 03/10/2026" /></div>
+    <div class="fld" style="margin:0;"><label for="${id('tickets')}">Tickets</label>
+      <input id="${id('tickets')}" type="number" min="1" max="20" placeholder="—" /></div>
+    <div class="fld" style="margin:0;"><label for="${id('time')}">Fire at (IST)</label>
+      <input id="${id('time')}" type="time" step="1" /></div>
+    <div class="fld" style="margin:0;"><label for="${id('team')}">Team</label>
+      <input id="${id('team')}" placeholder="e.g. KSS" spellcheck="false" /></div>
+    <div class="fld" style="margin:0;"><label for="${id('code')}">Book this code</label>
+      <input id="${id('code')}" placeholder="e.g. KSS3" spellcheck="false" list="${id('codes')}" />
+      <datalist id="${id('codes')}" class="ctl-codes"></datalist></div>
+  </div>
+  <div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap;align-items:center;">
+    <button class="nb ${key === 'all' ? 'nb-purple' : 'nb-green'}" onclick="ctlPush('${key}')">
+      ⬆ ${key === 'all' ? 'PUSH TO ALL' : 'PUSH TO THIS ONE'}</button>
+    <button class="nb nb-ghost nb-sm" onclick="ctlCmd('open','${key}')">⚡ OPEN</button>
+    <button class="nb nb-ghost nb-sm" onclick="ctlCmd('start','${key}')">▶ START</button>
+    <button class="nb nb-red nb-sm" onclick="ctlCmd('stop','${key}')">■ STOP</button>
+    ${key === 'all' ? '' : `<button class="nb nb-ghost nb-sm" onclick="ctlRename('${key}')">🏷 RENAME</button>`}
+    <span id="${id('msg')}" style="font-family:'Space Mono',monospace;font-size:11px;margin-left:6px;"></span>
+  </div>`;
+}
 
+function ctlMsg(key, text, tone){
+  const el = document.getElementById(`ctl-${key}-msg`);
+  if (!el) return;
+  el.textContent = text || '';
+  el.style.color = tone === 'ok' ? 'var(--green)' : tone === 'warn' ? 'var(--orange)' : 'var(--red)';
+  if (text) setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, 6000);
+}
+
+// ── render ────────────────────────────────────────────────────────────────
+// Cards are created once and then only their live parts are rewritten. A full
+// rebuild every four seconds would wipe whatever was half-typed into a form.
 function ctlRender(){
-  const box = document.getElementById('ctl-devices');
+  const box  = document.getElementById('ctl-devices');
   const live = ctlDevices.filter(ctlLive);
   const gone = ctlDevices.filter(d => !ctlLive(d));
 
@@ -8009,12 +8020,9 @@ function ctlRender(){
     <div class="stat c3"><div class="v">${new Set(live.map(d=>d.team).filter(Boolean)).size}</div><div class="l">TEAMS</div></div>
     <div class="stat c4"><div class="v">${gone.length}</div><div class="l">OFFLINE</div></div>`;
 
-  // "Send to" keeps whatever was chosen, as long as that device is still here.
-  const who = document.getElementById('ctl-who');
-  const keep = who.value;
-  who.innerHTML = '<option value="">Every device on this room</option>' +
-    live.map(d => `<option value="${escAttr(d.device)}">${escHtml(d.label || d.device)}${d.team ? ' · ' + escHtml(d.team) : ''}</option>`).join('');
-  if (keep && live.some(d => d.device === keep)) who.value = keep;
+  const n = live.length;
+  document.getElementById('ctl-all-count').textContent =
+    n ? `· ${n} laptop${n===1?'':'s'} will receive this` : '· nothing is reporting in';
 
   if (!ctlDevices.length){
     box.innerHTML = `<div class="chk-empty"><div class="big">NOBODY REPORTING</div>
@@ -8023,90 +8031,100 @@ function ctlRender(){
     return;
   }
 
-  // Each card answers three questions: who is this, what is it set to do, and
-  // when did the control room last change it.
-  const chip = (label, value) => `<span style="display:inline-flex;gap:6px;align-items:baseline;">
-      <span style="font-size:11px;color:var(--muted);">${label}</span>
-      <strong style="font-size:12.5px;">${escHtml(value)}</strong></span>`;
+  // Online first, then by name. Never by seen_at: that flips every heartbeat,
+  // and moving a card in the DOM blurs the field being typed into.
+  const byName = (a, b) => String(a.label || a.device).localeCompare(String(b.label || b.device));
+  const order = live.sort(byName).concat(gone.sort(byName));
+  const wanted = new Set(order.map(d => ctlKey(d.device)));
 
-  const card = d => {
-    const age = ctlAge(d), on = ctlLive(d);
-    const name = d.label || d.device;
-    const named = !!d.label;
-    const cfgAge = d.cfg_at ? Math.round((Date.now() - new Date(d.cfg_at).getTime())/1000) : null;
-    const cfgWhen = cfgAge === null ? null
-      : cfgAge < 60 ? cfgAge + 's ago'
-      : cfgAge < 3600 ? Math.round(cfgAge/60) + 'm ago' : Math.round(cfgAge/3600) + 'h ago';
+  // drop cards for devices that are no longer listed at all
+  [...box.children].forEach(el => { if (!wanted.has(el.id)) el.remove(); });
 
-    return `<div style="padding:14px 16px;border-radius:14px;margin-bottom:10px;
-         background:var(--surface-2);border:1px solid ${on ? 'var(--line)' : 'transparent'};
-         opacity:${on ? 1 : .45};">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;
-              background:${on ? (d.running ? 'var(--green)' : 'var(--blue)') : 'var(--muted)'};"></span>
-        <strong style="font-size:14px;">${escHtml(name)}</strong>
-        ${named ? `<span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">${escHtml(d.device)}</span>` : ''}
-        ${d.running ? '<span class="tab-count" style="background:var(--green);color:#052e16;">RUNNING</span>' : ''}
-        <span style="margin-left:auto;font-size:11.5px;color:var(--muted);font-family:'Space Mono',monospace;">
-          ${on ? (age < 10 ? 'just now' : age + 's ago') : 'offline ' + (age > 3600 ? Math.round(age/3600)+'h' : Math.round(age/60)+'m')}</span>
-      </div>
+  // never rearrange under someone's hands
+  const typing = box.contains(document.activeElement);
 
-      <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;">
-        ${chip('team', d.team || '—')}
-        ${chip('booking', d.picked || '—')}
-        ${chip('on', d.page || '—')}
-      </div>
+  order.forEach((d, idx) => {
+    const key = ctlKey(d.device);
+    let card = document.getElementById(key);
+    if (!card){
+      card = document.createElement('div');
+      card.id = key;
+      card.innerHTML = `<div class="ctl-head"></div><div class="ctl-state"></div>
+        <div class="ctl-got"></div><div class="ctl-form">${ctlFormHtml(key)}</div>`;
+      box.appendChild(card);
+      ctlPrefill(key, d);          // start from what that laptop already has
+    }
+    if (!typing && box.children[idx] !== card) box.insertBefore(card, box.children[idx] || null);
+    ctlPaintCard(card, d);
+  });
+  ctlFillCodes();
+}
 
-      <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:7px;padding-top:9px;
-                  border-top:1px solid var(--line);">
-        ${chip('opens', d.service || '—')}
-        ${chip('dates', d.dates || 'earliest open')}
-        ${chip('tickets', d.tickets == null ? '—' : d.tickets)}
-        ${chip('fires at', d.fire_at || 'not scheduled')}
-      </div>
+function ctlPaintCard(card, d){
+  const on = ctlLive(d), age = ctlAge(d);
+  const name = d.label || d.device;
+  card.style.cssText = `padding:16px 18px;border-radius:16px;margin-bottom:14px;
+    background:var(--surface-2);border:1px solid ${on ? 'var(--line)' : 'transparent'};
+    opacity:${on ? 1 : .5};`;
 
-      <div style="margin-top:8px;font-size:11.5px;color:${cfgWhen ? 'var(--green)' : 'var(--muted)'};">
-        ${cfgWhen ? `✓ settings received ${cfgWhen}${d.cfg_by ? ' from ' + escHtml(d.cfg_by) : ''}`
-                  : 'no settings pushed to this one yet'}
-      </div>
+  const chip = (l, v) => `<span style="display:inline-flex;gap:6px;align-items:baseline;">
+      <span style="font-size:11px;color:var(--muted);">${l}</span>
+      <strong style="font-size:12.5px;">${escHtml(v)}</strong></span>`;
 
-      <div style="display:flex;gap:6px;margin-top:11px;flex-wrap:wrap;">
-        <button class="nb nb-ghost nb-sm" onclick="ctlOne('${escAttr(d.device)}')">🎯 SEND TO THIS ONE</button>
-        <button class="nb nb-ghost nb-sm" onclick="ctlRename('${escAttr(d.device)}','${escAttr(name)}')">🏷 RENAME</button>
-        <button class="nb nb-red nb-sm" onclick="ctlCmd('stop','${escAttr(d.device)}')">■ STOP</button>
-      </div>
+  card.querySelector('.ctl-head').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+      <span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;
+            background:${on ? (d.running ? 'var(--green)' : 'var(--blue)') : 'var(--muted)'};"></span>
+      <strong style="font-size:15px;">${escHtml(name)}</strong>
+      ${d.label ? `<span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);">${escHtml(d.device)}</span>` : ''}
+      ${d.running ? '<span class="tab-count" style="background:var(--green);color:#052e16;">RUNNING</span>' : ''}
+      <span style="margin-left:auto;font-size:11.5px;color:var(--muted);font-family:'Space Mono',monospace;">
+        ${on ? (age < 10 ? 'just now' : age + 's ago')
+             : 'offline ' + (age > 3600 ? Math.round(age/3600)+'h' : Math.round(age/60)+'m')}</span>
     </div>`;
-  };
 
-  box.innerHTML = live.map(card).join('')
-    + (gone.length ? `<div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1.4px;
-         color:var(--muted);margin:16px 0 8px;">NOT REPORTING</div>` + gone.map(card).join('') : '');
+  card.querySelector('.ctl-state').innerHTML = `
+    <div style="display:flex;gap:18px;flex-wrap:wrap;padding:10px 0;
+                border-top:1px solid var(--line);border-bottom:1px solid var(--line);">
+      ${chip('team', d.team || '—')}${chip('booking', d.picked || '—')}${chip('on', d.page || '—')}
+      ${chip('opens', d.service || '—')}${chip('dates', d.dates || 'earliest open')}
+      ${chip('tickets', d.tickets == null ? '—' : d.tickets)}${chip('fires at', d.fire_at || 'not scheduled')}
+    </div>`;
+
+  const cfgAge = d.cfg_at ? Math.round((Date.now() - new Date(d.cfg_at).getTime())/1000) : null;
+  const when = cfgAge === null ? null
+    : cfgAge < 60 ? cfgAge + 's ago' : cfgAge < 3600 ? Math.round(cfgAge/60) + 'm ago'
+    : Math.round(cfgAge/3600) + 'h ago';
+  card.querySelector('.ctl-got').innerHTML =
+    `<div style="margin:9px 0 12px;font-size:11.5px;color:${when ? 'var(--green)' : 'var(--muted)'};">
+       ${when ? `✓ settings received ${when}${d.cfg_by ? ' from ' + escHtml(d.cfg_by) : ''}`
+              : 'no settings pushed to this one yet'}</div>`;
 }
 
-// Naming happens on the device, but doing it for all of them from here is
-// what makes a row of laptops readable in the first place.
-async function ctlRename(device, current){
-  const name = prompt('Name for this session:', current === device ? '' : current);
-  if (name === null) return;
-  try {
-    await ctlPost({ cmd:'rename', payload:{ label: name.trim().slice(0,40) }, to_device: device });
-    ctlMsg('Renaming ' + device + ' to "' + name.trim() + '" — it applies within a second.', 'ok');
-    setTimeout(ctlRefresh, 1800);
-  } catch(e){ ctlMsg(e.message, 'err'); }
+// The per-device form opens showing what that laptop is actually set to, so
+// changing one number does not mean retyping the rest.
+function ctlPrefill(key, d){
+  const set = (n, v) => { const el = document.getElementById(`ctl-${key}-${n}`); if (el && v != null) el.value = v; };
+  set('service', d.service || '');
+  set('dates',   d.dates || '');
+  set('tickets', d.tickets == null ? '' : d.tickets);
+  set('time',    d.fire_at || '');
+  set('team',    d.team || '');
+  set('code',    d.picked || '');
 }
 
-function ctlOne(device){
-  document.getElementById('ctl-who').value = device;
-  const d = ctlDevices.find(x => x.device === device);
-  ctlMsg('Sending to ' + ((d && d.label) || device) + ' only.', 'ok');
-  document.getElementById('ctl-service').focus();
+function ctlFillCodes(){
+  const html = (typeof ttdRows !== 'undefined' ? ttdRows : [])
+    .map(r => `<option value="${escAttr(r.code||'')}">`).join('');
+  document.querySelectorAll('datalist.ctl-codes').forEach(dl => dl.innerHTML = html);
 }
 
-function ctlMsg(text, tone){
-  const el = document.getElementById('ctl-msg');
-  if (!el) return;
-  el.textContent = text || '';
-  el.style.color = tone === 'ok' ? 'var(--green)' : tone === 'warn' ? 'var(--orange)' : 'var(--red)';
+// ── sending ───────────────────────────────────────────────────────────────
+// key === 'all' → everyone on the room; otherwise the device that card is for.
+function ctlDeviceOf(key){
+  if (key === 'all') return null;
+  const d = ctlDevices.find(x => ctlKey(x.device) === key);
+  return d ? d.device : null;
 }
 
 async function ctlPost(row){
@@ -8114,45 +8132,53 @@ async function ctlPost(row){
                          body: JSON.stringify(Object.assign({ room: ctlRoom(), issued_by: 'control-room' }, row)) });
 }
 
-// Only the fields that were filled in are sent — an empty box means "leave that
-// device's setting alone", not "clear it".
-async function ctlPush(){
-  const g = id => (document.getElementById(id)?.value || '').trim();
+async function ctlPush(key){
+  const g = n => (document.getElementById(`ctl-${key}-${n}`)?.value || '').trim();
   const payload = {};
-  if (g('ctl-service')) payload.service = g('ctl-service');
-  if (g('ctl-dates'))   payload.dates   = g('ctl-dates');
-  if (g('ctl-tickets')) payload.tickets = +g('ctl-tickets');
-  if (g('ctl-team'))    payload.team    = g('ctl-team').toUpperCase();
-  if (g('ctl-code'))    payload.code    = g('ctl-code').toUpperCase();
-  if (g('ctl-time'))    payload.time    = g('ctl-time');
+  if (g('service')) payload.service = g('service');
+  if (g('dates'))   payload.dates   = g('dates');
+  if (g('tickets')) payload.tickets = +g('tickets');
+  if (g('team'))    payload.team    = g('team').toUpperCase();
+  if (g('code'))    payload.code    = g('code').toUpperCase();
+  if (g('time'))    payload.time    = g('time');
 
-  if (!Object.keys(payload).length){ ctlMsg('Nothing filled in — every field is empty.', 'warn'); return; }
+  if (!Object.keys(payload).length){ ctlMsg(key, 'every field is empty', 'warn'); return; }
 
-  const to = document.getElementById('ctl-who').value || null;
+  const to = ctlDeviceOf(key);
   const live = ctlDevices.filter(ctlLive);
-  if (!live.length){ ctlMsg('No device is reporting in — nothing would receive this.', 'warn'); return; }
+  if (key === 'all' && !live.length){ ctlMsg(key, 'nothing is reporting in', 'warn'); return; }
 
   try {
     await ctlPost({ cmd:'config', payload: payload, to_device: to });
-    const n = to ? 1 : live.length;
-    ctlMsg(`Sent ${Object.keys(payload).join(', ')} to ${to || n + ' device' + (n===1?'':'s')}. `
-         + `They apply it within a second.`, 'ok');
-    toast('SETTINGS PUSHED', 'ok');
+    ctlMsg(key, `sent ${Object.keys(payload).join(', ')}`, 'ok');
+    toast(to ? 'PUSHED TO ' + to.toUpperCase() : 'PUSHED TO ALL', 'ok');
     setTimeout(ctlRefresh, 1800);
-  } catch(e){ ctlMsg(e.message, 'err'); }
+  } catch(e){ ctlMsg(key, e.message, 'err'); }
 }
 
-async function ctlCmd(cmd, device){
-  const to = device || document.getElementById('ctl-who').value || null;
-  const target = cmd === 'open' ? (document.getElementById('ctl-service').value || '') : null;
-  if (cmd === 'open' && !target){ ctlMsg('Choose a service first.', 'warn'); return; }
+async function ctlCmd(cmd, key){
+  const to = ctlDeviceOf(key);
+  const target = cmd === 'open' ? (document.getElementById(`ctl-${key}-service`)?.value || '') : null;
+  if (cmd === 'open' && !target){ ctlMsg(key, 'choose a service first', 'warn'); return; }
   try {
     await ctlPost({ cmd: cmd, target: target, to_device: to });
-    ctlMsg({ open:'Opening ' + target, start:'Started', stop:'Stopped' }[cmd]
-           + ' on ' + (to || 'every device on this room') + '.', 'ok');
-    toast(cmd.toUpperCase() + ' SENT', 'ok');
+    ctlMsg(key, { open:'opening ' + target, start:'started', stop:'stopped' }[cmd], 'ok');
+    toast(cmd.toUpperCase() + (to ? ' → ' + to.toUpperCase() : ' → ALL'), 'ok');
     setTimeout(ctlRefresh, 1800);
-  } catch(e){ ctlMsg(e.message, 'err'); }
+  } catch(e){ ctlMsg(key, e.message, 'err'); }
+}
+
+async function ctlRename(key){
+  const dev = ctlDeviceOf(key);
+  if (!dev) return;
+  const d = ctlDevices.find(x => x.device === dev);
+  const name = prompt('Name for this laptop:', (d && d.label) || '');
+  if (name === null) return;
+  try {
+    await ctlPost({ cmd:'rename', payload:{ label: name.trim().slice(0,40) }, to_device: dev });
+    ctlMsg(key, 'renaming…', 'ok');
+    setTimeout(ctlRefresh, 1800);
+  } catch(e){ ctlMsg(key, e.message, 'err'); }
 }
 
 // ════════════════════════════════════════════
@@ -8217,13 +8243,6 @@ function ttdFiltered(){
   return ttdRows.filter(r => [r.code, r.sevakname, r.mobile, r.idnumber]
     .concat(ttdPartyOf(r).map(x => x.name))
     .some(v => String(v||'').toLowerCase().includes(q)));
-}
-
-// The booking codes, offered to the control room's "book this code" box.
-function ctlFillCodes(){
-  const dl = document.getElementById('ctl-codes');
-  if (!dl) return;
-  dl.innerHTML = ttdRows.map(r => `<option value="${escAttr(r.code||'')}">`).join('');
 }
 
 function ttdRender(){
