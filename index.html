@@ -2339,11 +2339,11 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
         <div class="fld"><label for="r-code">Code <span class="req">*</span></label>
           <div class="id-row">
             <input id="r-code" list="dl-code" placeholder="e.g. CODE001" />
-            <button class="mini-btn" type="button" onclick="fillNextCode('r-code')" title="Fill next code in sequence">⚡</button>
+            <button class="mini-btn" type="button" onclick="seedLastTeamCode('r-code',true)" title="Use last saved database code (editable)">⚡</button>
           </div>
         </div>
-        <div class="fld"><label for="r-sevakName">Sevak Name <span class="req">*</span></label><input id="r-sevakName" placeholder="First / Given Name" /></div>
-        <div class="fld"><label for="r-surName">Surname</label><input id="r-surName" placeholder="Last Name" /></div>
+        <div class="fld"><label for="r-sevakName">Sevak Name (Full Name) <span class="req">*</span></label><input id="r-sevakName" placeholder="First / Given Name" /></div>
+        <input type="hidden" id="r-surName" value="" />
         <div class="fld opt"><label for="r-fatherOrSpouseName">Father / Spouse Name</label><input id="r-fatherOrSpouseName" placeholder="Father or Spouse" /></div>
         <div class="fld"><label for="r-dob">Date of Birth <span class="req">*</span></label><input id="r-dob" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" /></div>
         <div class="fld"><label for="r-mobileNo">Mobile <span class="req">*</span></label>
@@ -2859,11 +2859,11 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
       <div class="fld"><label for="f-code">Code <span class="req">*</span></label>
         <div class="id-row">
           <input id="f-code" list="dl-code" />
-          <button class="mini-btn" type="button" onclick="fillNextCode('f-code')" title="Fill next code in sequence">⚡</button>
+          <button class="mini-btn" type="button" onclick="seedLastTeamCode('f-code',true)" title="Use last saved database code (editable)">⚡</button>
         </div>
       </div>
-      <div class="fld"><label for="f-sevakName">Sevak Name <span class="req">*</span></label><input id="f-sevakName" /></div>
-      <div class="fld"><label for="f-surName">Surname</label><input id="f-surName" /></div>
+      <div class="fld"><label for="f-sevakName">Sevak Name (Full Name) <span class="req">*</span></label><input id="f-sevakName" /></div>
+      <input type="hidden" id="f-surName" value="" />
       <div class="fld"><label for="f-fatherOrSpouseName">Father / Spouse Name</label><input id="f-fatherOrSpouseName" /></div>
       <div class="fld"><label for="f-dob">Date of Birth <span class="req">*</span></label><input id="f-dob" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" /></div>
       <div class="fld"><label for="f-gender">Gender <span class="req">*</span></label>
@@ -3883,7 +3883,39 @@ let tableColumns = new Set();
 let knownMissingCols = new Set();
 let lastDroppedCols = [];
 
+function mergeSevakName(first, surname){
+  const name=String(first||'').trim().replace(/\s+/g,' ');
+  const last=String(surname||'').trim().replace(/\s+/g,' ');
+  if(!last) return name;
+  if(!name) return last;
+  if(name.toLowerCase()===last.toLowerCase() || name.toLowerCase().endsWith(' '+last.toLowerCase())) return name;
+  return name+' '+last;
+}
+function normalizeAadhaar(value){
+  const v=String(value||'').trim();
+  return /^[\d\s-]+$/.test(v)?v.replace(/[\s-]/g,''):v;
+}
+function lastSavedTeamCode(){
+  const rows=allRecords.filter(r=>String(r.code||'').trim());
+  rows.sort((a,b)=>{
+    const dateDiff=(createdOf(b)?.getTime()||0)-(createdOf(a)?.getTime()||0);
+    if(dateDiff) return dateDiff;
+    return String(b.id||'').localeCompare(String(a.id||''),undefined,{numeric:true});
+  });
+  return String(rows[0]?.code||'').trim();
+}
+function seedLastTeamCode(id='r-code',force=false){
+  const el=document.getElementById(id);
+  if(el && (force || !el.value.trim())) setFieldValue(el,lastSavedTeamCode());
+}
+
 function filterToColumns(data) {
+  data={...data};
+  if(Object.hasOwn(data,'sevakName') || Object.hasOwn(data,'surName')){
+    data.sevakName=mergeSevakName(data.sevakName,data.surName);
+    data.surName='';
+  }
+  if(Object.hasOwn(data,'idNumber')) data.idNumber=normalizeAadhaar(data.idNumber);
   const out = {}; const dropped = [];
   for (const k of Object.keys(data)) {
     const exists = tableColumns.size === 0 ? true : tableColumns.has(k);
@@ -4022,6 +4054,7 @@ async function fetchAll() {
     if (out.length > 100000) { toast('STOPPED AT 100,000 ROWS','err'); break; }
   }
   allRecords = out;
+  seedLastTeamCode();
   buildStateFilter();
   buildCodeFilter();
   rebuildDatalists();
@@ -4293,6 +4326,7 @@ function openAdd(){
   editRowId=null; mNewPhoto='';
   document.getElementById('m-verb').textContent='ADD';
   clearModalForm();
+  seedLastTeamCode('f-code');
   openOverlay('form-overlay');
 }
 function openEdit(){
@@ -4319,6 +4353,7 @@ function setFieldValue(el, v, allowNew = true){
 }
 
 function fillModalFrom(r){
+  r={...r,sevakName:mergeSevakName(r.sevakName,r.surName),surName:'',idNumber:normalizeAadhaar(r.idNumber)};
   DATA_FIELDS.forEach(f=>{
     const el=document.getElementById('f-'+f); if(!el) return;
     setFieldValue(el, f==='dob' ? normDob(r.dob) : (f==='gender' ? normGender(r.gender) : (r[f]||'')), f!=='gender');
@@ -5089,6 +5124,7 @@ document.addEventListener('paste', e => {
 const OCR_PROMPT = `You are a precise OCR assistant for handwritten Indian registration forms.
 Extract ONLY these fields. Return ONLY a valid JSON object (null for unreadable):
 {"idNumber":null,"code":null,"sevakName":null,"surName":null,"fatherOrSpouseName":null,"dob":null,"mobileNo":null,"email":null,"gender":null,"state":null,"district":null,"city":null,"street":null,"doorNo":null,"pincode":null}
+Put the entire full name, including surname, in sevakName. Return surName as null. Return idNumber as digits without spaces. Return code as null; the operator chooses the database team code.
 Rules: dob in DD/MM/YYYY, gender must be "Male"/"Female"/"Other". NO markdown, NO explanation.`;
 
 function parseGeminiJson(text){
@@ -5155,6 +5191,15 @@ async function openrouterVision(apiKey, pngDataUrl, promptText, maxTokens=8192, 
 }
 
 function applyOcrFields(fields, prefix){
+  fields={...fields};
+  if(fields.sevakName || fields.surName){
+    fields.sevakName=mergeSevakName(fields.sevakName,fields.surName);
+    const surname=document.getElementById(prefix+'surName');
+    if(surname) surname.value='';
+  }
+  delete fields.surName;
+  delete fields.code;
+  if(fields.idNumber) fields.idNumber=normalizeAadhaar(fields.idNumber);
   let filled=0;
   Object.entries(fields||{}).forEach(([key,val])=>{
     const el=document.getElementById(prefix+key);
@@ -5169,8 +5214,10 @@ function applyOcrFields(fields, prefix){
         el.value=o.value; flash(el); filled++; return;
       }
     }
-    el.value=v; flash(el); filled++;
+    setFieldValue(el,v); flash(el); filled++;
   });
+  const ctx=prefix==='r-'?'reg':prefix==='f-'?'modal':null;
+  if(ctx && fields.pincode) onPincodeInput(ctx);
   return filled;
 }
 
@@ -5443,6 +5490,7 @@ async function verifyPincode(pin, ctx) {
 
   try {
     const api = await lookupPincode(pin);
+    if(document.getElementById(prefix+'pincode')?.value.trim()!==pin) return;
     statusEl.textContent = '';
 
     if (api) {
@@ -5457,57 +5505,20 @@ async function verifyPincode(pin, ctx) {
       return;
     }
 
-    const curDistrict = (districtEl?.value || '').trim();
-    const curState    = (stateEl?.value || '').trim();
-    const mismatches = [];
-    if (curDistrict && curDistrict.toLowerCase() !== api.district.toLowerCase())
-      mismatches.push({ field:'District', fieldId: prefix+'district', current: curDistrict, correct: api.district });
-    if (curState && curState.toLowerCase() !== api.state.toLowerCase())
-      mismatches.push({ field:'State', fieldId: prefix+'state', current: curState, correct: api.state });
-
-    if (mismatches.length === 0) {
-      bar.className = 'pin-verify-bar show ok';
-      msgEl.innerHTML = `✅ Pincode ${escHtml(pin)} verified — ${escHtml(api.district)}, ${escHtml(api.state)}`;
-      let filled = false;
-      if (districtEl && !districtEl.value.trim()) { setFieldValue(districtEl, api.district); flash(districtEl); filled = true; }
-      if (stateEl    && !stateEl.value.trim())    { setFieldValue(stateEl,    api.state);    flash(stateEl);    filled = true; }
-      // One post office means the locality is unambiguous — take it
-      const cityEl = document.getElementById(prefix + 'city');
-      if (cityEl && !cityEl.value.trim() && api.offices?.length === 1) {
-        setFieldValue(cityEl, api.offices[0]); flash(cityEl); filled = true;
-      }
-      if (filled) msgEl.insertAdjacentHTML('beforeend','<small>Empty fields filled from the pincode</small>');
-      if (api.offices?.length > 1)
-        msgEl.insertAdjacentHTML('beforeend',
-          `<small>${api.offices.length} localities at this pincode — open the City list to pick one</small>`);
-      return;
+    let corrected=0;
+    for(const [el,value] of [[districtEl,api.district],[stateEl,api.state]]){
+      if(el && value && el.value.trim()!==value){setFieldValue(el,value);flash(el);corrected++;}
     }
-
-    bar.className = 'pin-verify-bar show';
-    msgEl.innerHTML = `⚠ Pincode ${escHtml(pin)} doesn't match the district/state entered`
-      + `<small>India Post says: <strong>${escHtml(api.district)}</strong>, <strong>${escHtml(api.state)}</strong></small>`;
-
-    mismatches.forEach(m => {
-      const row = document.createElement('div');
-      row.className = 'pin-mismatch-item';
-      row.innerHTML = `<span style="color:#888;font-weight:700;">${escHtml(m.field.toUpperCase())}:</span>
-        <span class="old">${escHtml(m.current)}</span><span>→</span><span class="nw">${escHtml(m.correct)}</span>`;
-      const b = document.createElement('button');
-      b.className = 'nb nb-green nb-sm'; b.style.marginLeft = 'auto';
-      b.textContent = `✓ USE "${m.correct}"`;
-      b.onclick = () => applyPinFix(m.fieldId, m.correct, ctx, m.field);
-      row.appendChild(b);
-      itemsEl.appendChild(row);
-    });
-
-    if (mismatches.length > 1) {
-      const wrap = document.createElement('div'); wrap.style.marginTop = '6px';
-      const all = document.createElement('button');
-      all.className = 'nb nb-orange nb-sm'; all.textContent = '⚡ UPDATE ALL';
-      all.onclick = () => mismatches.forEach(m => applyPinFix(m.fieldId, m.correct, ctx, m.field));
-      wrap.appendChild(all); itemsEl.appendChild(wrap);
+    const cityEl=document.getElementById(prefix+'city');
+    if(cityEl && api.offices?.length===1 && cityEl.value.trim()!==api.offices[0]){
+      setFieldValue(cityEl,api.offices[0]);flash(cityEl);corrected++;
     }
+    bar.className='pin-verify-bar show ok';
+    msgEl.innerHTML=`✅ Pincode ${escHtml(pin)} verified — ${escHtml(api.district)}, ${escHtml(api.state)}`;
+    if(corrected){msgEl.insertAdjacentHTML('beforeend','<small>Address corrected from the pincode</small>');if(ctx==='reg') markDirty();}
+    if(api.offices?.length>1) msgEl.insertAdjacentHTML('beforeend',`<small>${api.offices.length} localities share this pincode — choose the correct City. Street and door number stay as entered.</small>`);
   } catch(e) {
+    if(document.getElementById(prefix+'pincode')?.value.trim()!==pin) return;
     bar.className = 'pin-verify-bar show err';
     msgEl.textContent = `❌ Could not verify pincode: ${e.message}`;
     statusEl.textContent = '';
@@ -5635,6 +5646,7 @@ async function submitForm(){
 function resetRegForm(){
   DATA_FIELDS.forEach(f=>{const el=document.getElementById('r-'+f);if(el)el.value='';});
   document.getElementById('r-gender').value='';
+  seedLastTeamCode();
   finalPhoto=null;finalDoc=null;aiEd=null;phEd=null;docEd=null;
   if (typeof clearPageSets === 'function') clearPageSets();
   document.getElementById('ph-preview').innerHTML='<span>No photo selected</span>';
@@ -6645,7 +6657,7 @@ async function runChecker() {
   progFill.style.width = '3%';
   progTxt.textContent = 'STARTING SCAN…';
 
-  const OPTIONAL_TRACKED = ['code','surName','email','district','city','pincode'];
+  const OPTIONAL_TRACKED = ['code','email','district','city','pincode'];
   const records = [...allRecords];
 
   // ── 1. MISSING / EMPTY FIELDS ──────────────
@@ -9371,10 +9383,7 @@ function wireEntryHelpers(get) {
   const idn = get('idNumber');
   if (idn && !idn._aad) {
     idn._aad = 1;
-    idn.addEventListener('blur', () => {
-      const v = idn.value.trim();
-      if (/^\d{4}[\s-]\d{4}[\s-]\d{4}$/.test(v)) idn.value = v.replace(/[\s-]/g,'');
-    });
+    ['input','blur'].forEach(event=>idn.addEventListener(event,()=>{ idn.value=normalizeAadhaar(idn.value); }));
   }
 
   const code = get('code');
@@ -9983,8 +9992,7 @@ function parseFullDetails(raw) {
   if (nameStr) {
     const parts = toProperCase(cleanName(nameStr)).split(' ').filter(Boolean);
     if (parts.length) {
-      out.sevakName = parts.shift();
-      if (parts.length) out.surName = parts.join(' ');
+      out.sevakName = parts.join(' ');
     }
   }
 
@@ -11826,7 +11834,7 @@ function fastNormalise(row, f){
     el.value = k === 'm' ? 'Male' : k === 'f' ? 'Female' : k === 'o' ? 'Other' : normGender(v) || v;
   }
   if (f === 'dob')      el.value = normDob(v) || v;
-  if (f === 'idNumber') el.value = v.replace(/\s+/g,'');
+  if (f === 'idNumber') el.value = normalizeAadhaar(v);
   if (f === 'mobileNo') el.value = v.replace(/\D/g,'').slice(-10);
   if (f === 'sevakName') el.value = toProperCase(cleanName(v));
   if (f === 'pincode') el.value = v.replace(/\D/g,'').slice(0,6);
@@ -12518,6 +12526,7 @@ async function fastPinCheck(row, quiet){
   if (flag){ flag.className = 'fast-pin-flag busy'; flag.textContent = '⏳'; flag.title = 'Checking with India Post…'; }
   try {
     const api = await lookupPincode(pin);
+    if(fastVal(row,'pincode')!==pin) return;
     if (!api){
       fastPin[row] = { pin, state: 'none' };
     } else {
@@ -12525,9 +12534,9 @@ async function fastPinCheck(row, quiet){
       // An empty district or state is not a disagreement — it is a gap the
       // pincode can fill, which is the whole point of checking it.
       let filled = 0;
-      if (!d){ fastEl(row,'district').value = api.district; flash(fastEl(row,'district')); filled++; }
-      if (!st){ fastEl(row,'state').value = api.state; flash(fastEl(row,'state')); filled++; }
-      if (!fastVal(row,'city') && api.offices?.length === 1){
+      if (d!==api.district){ fastEl(row,'district').value = api.district; flash(fastEl(row,'district')); filled++; }
+      if (st!==api.state){ fastEl(row,'state').value = api.state; flash(fastEl(row,'state')); filled++; }
+      if (api.offices?.length === 1 && fastVal(row,'city')!==api.offices[0]){
         fastEl(row,'city').value = api.offices[0]; flash(fastEl(row,'city')); filled++;
       }
       const d2 = fastVal(row,'district'), s2 = fastVal(row,'state');
