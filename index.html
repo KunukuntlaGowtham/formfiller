@@ -2667,7 +2667,11 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
       </div>
       <div class="fld" style="margin:0;min-width:168px;">
         <label for="bx-model">Model</label>
-        <input id="bx-model" list="bx-models" spellcheck="false" onchange="bxSetModel()" />
+        <div style="display:flex;gap:5px;">
+          <input id="bx-model" list="bx-models" spellcheck="false" onchange="bxSetModel()" style="flex:1;min-width:0;" />
+          <button class="mini-btn" type="button" onclick="bxLoadModels()"
+                  title="Ask your key which models it can use">↻</button>
+        </div>
         <datalist id="bx-models"></datalist>
       </div>
       <div class="fld" style="margin:0;min-width:150px;">
@@ -5387,7 +5391,7 @@ async function geminiVision(gemKey, pngDataUrl, promptText, maxTokens=2048, mode
                   data:pngDataUrl.split(',')[1]}},
     {text:promptText}
   ]}],generationConfig:{temperature:0.05,maxOutputTokens:maxTokens}};
-  const res=await fetch(GEMINI_URL(model || (typeof bxModel === 'function' ? bxModel() : 'gemini-2.5-flash')),
+  const res=await fetch(GEMINI_URL(model || (typeof bxModel === 'function' ? bxModel() : BX_DEFAULT_MODEL)),
     {method:'POST',headers:geminiHeaders(gemKey),body:JSON.stringify(payload)});
   if(!res.ok){let m='Gemini error '+res.status;try{const e=await res.json();m=e.error?.message||m;}catch(_){}throw new Error(m);}
   const data=await res.json();
@@ -5527,11 +5531,14 @@ function flash(el){el.classList.add('ai-fill');setTimeout(()=>el.classList.remov
 // Which model, and whether to trade time for accuracy. Both are the operator's
 // call: a smudged stack of handwritten forms wants Pro, one page at a time and
 // every pixel we can send; a clean printed batch does not.
-const BX_MODELS = [
-  'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
-  'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-pro-latest'
-];
-const BX_DEFAULT_MODEL = 'gemini-2.5-pro';
+// Model names expire. gemini-2.5-pro was this app's default for exactly one
+// day before Google closed it to new keys. So the list is not written here —
+// it is asked for, with your own key, and whatever your key can actually use
+// is what the box offers. These two are only a starting point for the very
+// first call, before the real list has come back.
+let BX_MODELS = ['gemini-flash-latest', 'gemini-pro-latest'];
+let BX_DEFAULT_MODEL = 'gemini-flash-latest';
+let bxModelsLoaded = false;
 
 let bxCfg = { model: BX_DEFAULT_MODEL, mode: 'careful' };
 try {
@@ -5547,7 +5554,83 @@ const bxQuality  = () => bxCareful() ? VISION_CAREFUL_QUALITY : VISION_QUALITY;
 const bxModel    = () => (bxCfg.model || BX_DEFAULT_MODEL).trim();
 // Re-reading with the same model is still a second opinion; a different one is
 // a better one. Only used when the first read is unsure about something needed.
-const bxSureModel = () => /pro/i.test(bxModel()) ? bxModel() : 'gemini-2.5-pro';
+// The surer model is the best "pro" your key actually has, not a name I guessed.
+const bxSureModel = () => {
+  if (/pro/i.test(bxModel())) return bxModel();
+  const pro = bxRank(BX_MODELS.filter(m => /pro/i.test(m)))[0];
+  return pro || bxModel();
+};
+
+// Newest first: by version number, then pro over flash, then a stable release
+// over a preview. Good enough to pick a sane default out of a live list.
+function bxRank(list){
+  const score = m => {
+    const v = parseFloat((m.match(/(\d+(?:\.\d+)?)/) || [0, 0])[1]) || 0;
+    return v * 100
+         + (/pro/i.test(m) ? 30 : /flash/i.test(m) ? 20 : 0)
+         + (/lite/i.test(m) ? -10 : 0)
+         + (/preview|exp/i.test(m) ? -5 : 0)
+         + (/latest/i.test(m) ? 1 : 0);
+  };
+  return [...list].sort((a, b) => score(b) - score(a));
+}
+
+// Ask the key what it can use. Google has renamed the capability field between
+// versions, so accept either, and keep everything if neither is present rather
+// than showing an empty list.
+async function bxLoadModels(quiet){
+  let key;
+  try { key = geminiKey(); } catch(e){ if (!quiet) bxMsg(e.message, 'err'); return []; }
+  try {
+    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200',
+                            { headers: geminiHeaders(key) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const all = (data.models || []).map(m => String(m.name || '').replace(/^models\//, ''))
+      .filter(Boolean);
+    const canGenerate = (data.models || []).filter(m => {
+      const acts = m.supportedGenerationMethods || m.supported_actions || m.supportedActions;
+      return !Array.isArray(acts) || acts.some(a => /generatecontent/i.test(String(a)));
+    }).map(m => String(m.name || '').replace(/^models\//, ''));
+    const list = bxRank((canGenerate.length ? canGenerate : all)
+      .filter(m => /^gemini/i.test(m) && !/embedding|aqa|imagen|veo|tts/i.test(m)));
+    if (!list.length) throw new Error('no usable models came back');
+
+    BX_MODELS = list;
+    BX_DEFAULT_MODEL = list[0];
+    bxModelsLoaded = true;
+    const dl = document.getElementById('bx-models');
+    if (dl) dl.innerHTML = list.map(m => `<option value="${escAttr(m)}"></option>`).join('');
+
+    // If what we were set to is gone, move to the best one that is left and
+    // say so, rather than failing on the next scan.
+    if (!list.includes(bxCfg.model)){
+      const was = bxCfg.model;
+      bxCfg.model = list[0];
+      bxSaveCfg();
+      const el = document.getElementById('bx-model');
+      if (el) el.value = bxCfg.model;
+      // Always said out loud, even on the quiet startup fetch: the note
+      // underneath would otherwise still be naming the model that just died.
+      bxMsg(`${was} is not available to your key — now using ${bxCfg.model}`, 'warn');
+      toast('MODEL SWITCHED TO ' + bxCfg.model.toUpperCase(), 'warn');
+    } else bxNote();
+    return list;
+  } catch(e){
+    if (!quiet) bxMsg('could not list models: ' + briefErr(e), 'err');
+    return [];
+  }
+}
+
+// Google's "this model is gone" reply names the replacement. Worth one retry.
+function bxRetireModel(msg){
+  if (!/no longer available|not found|is not supported|does not exist/i.test(msg)) return null;
+  const m = msg.match(/models\/([A-Za-z0-9.\-_]+)/g);
+  const names = (m || []).map(x => x.replace('models/', ''));
+  const current = bxModel();
+  const suggested = names.find(n => n !== current);
+  return suggested || null;
+}
 
 const BX_POOL   = 4;                       // fast mode only
 const BX_FIELDS = ['code','sevakName','fatherOrSpouseName','dob','gender','mobileNo',
@@ -5593,6 +5676,7 @@ let bxNoThinking = false;
 async function geminiMulti(gemKey, images, promptText, maxTokens, model){
   maxTokens = maxTokens || (bxCareful() ? 8192 : 4096);
   model = model || bxModel();
+  // reassigned below if the model turns out to have been retired
   const parts = [{ text: promptText }];
   images.forEach((im, i) => {
     parts.push({ text: `--- Image ${i} (width=${im.w}, height=${im.h}) ---` });
@@ -5613,6 +5697,18 @@ async function geminiMulti(gemKey, images, promptText, maxTokens, model){
       try { const e = await res.json(); m = e.error?.message || m; } catch(_){}
       // Older or newer endpoints that do not know the field say so — drop it once.
       if (!bxNoThinking && res.status === 400 && /thinking/i.test(m)) { bxNoThinking = true; continue; }
+      // A retired model names its replacement in the error. Take it, remember
+      // it, refresh the list, and try once more rather than failing the batch.
+      const moved = bxRetireModel(m);
+      if (moved && attempt === 0 && model === bxModel()){
+        bxCfg.model = moved; bxSaveCfg();
+        const el = document.getElementById('bx-model');
+        if (el) el.value = moved;
+        model = moved;
+        toast('MODEL RETIRED — NOW USING ' + moved.toUpperCase(), 'warn');
+        bxLoadModels(true);
+        continue;
+      }
       throw new Error(m);
     }
     const data = await res.json();
@@ -5628,6 +5724,7 @@ function bxEnter(){
   const dl = document.getElementById('bx-models');
   if (dl && !dl.children.length)
     dl.innerHTML = BX_MODELS.map(m => `<option value="${escAttr(m)}"></option>`).join('');
+  if (!bxModelsLoaded) bxLoadModels(true);
   const mEl = document.getElementById('bx-model');
   if (mEl) mEl.value = bxModel();
   const sEl = document.getElementById('bx-mode');
@@ -6608,7 +6705,7 @@ Fix spelling and fill missing address fields consistently. Return ONLY JSON:
 {"state":null,"district":null,"city":null,"pincode":null}
 Current: state="${state}", district="${district}", city="${city}", pincode="${pincode}"`}]}],generationConfig:{temperature:0.1,maxOutputTokens:300}};
   try{
-    const res=await fetch(GEMINI_URL(typeof bxModel === 'function' ? bxModel() : 'gemini-2.5-flash'),{method:'POST',headers:geminiHeaders(gemKey),body:JSON.stringify(payload)});
+    const res=await fetch(GEMINI_URL(typeof bxModel === 'function' ? bxModel() : BX_DEFAULT_MODEL),{method:'POST',headers:geminiHeaders(gemKey),body:JSON.stringify(payload)});
     if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Gemini error '+res.status);}
     const data=await res.json();
     const txt=(data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('');
