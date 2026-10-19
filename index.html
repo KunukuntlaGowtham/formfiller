@@ -2000,6 +2000,18 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
 .bx-foot{display:flex;gap:6px;align-items:center;margin-top:11px;flex-wrap:wrap;}
 .bx-note{font-size:10.5px;color:var(--muted);line-height:1.5;}
 @media (max-width:640px){ .bx-grid{grid-template-columns:1fr;} .bx-fields{grid-template-columns:1fr;} }
+
+/* ── BOOKING BOARD ──────────────────────────────────────────────────── */
+.bd-row{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;margin-bottom:9px;overflow:hidden;}
+.bd-row.open{border-color:var(--accent);}
+.bd-main{display:flex;gap:14px;align-items:center;padding:12px 15px;cursor:pointer;flex-wrap:wrap;}
+.bd-main:hover{background:rgba(124,92,240,.05);}
+.bd-bar{height:6px;border-radius:999px;background:var(--line);overflow:hidden;margin-bottom:5px;}
+.bd-bar span{display:block;height:100%;border-radius:999px;transition:width .3s;}
+.bd-people{display:flex;flex-wrap:wrap;gap:6px;padding:0 15px 13px;}
+.bd-person{font-size:11.5px;padding:3px 9px;border-radius:999px;background:var(--line);color:var(--muted);}
+.bd-person.out{background:rgba(245,158,11,.18);color:var(--orange);font-weight:600;}
+@media (max-width:720px){ .bd-main{gap:9px;} .bd-main>div{min-width:0!important;} }
 </style>
 </head>
 <body class="signed-out">
@@ -2067,6 +2079,9 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
     </button>
     <button class="tab-btn" data-tab="teams" onclick="switchTab('teams')">
       Teams <span class="tab-count" id="tc-teams">0</span>
+    </button>
+    <button class="tab-btn" data-tab="board" onclick="switchTab('board')">
+      Booking <span class="tab-count" id="tc-board">0</span>
     </button>
     <button class="tab-btn" data-tab="staff" onclick="switchTab('staff')">
       Staff <span class="tab-count" id="tc-staff">0</span>
@@ -2392,7 +2407,7 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
         <div class="fld opt"><label for="r-fatherOrSpouseName">Father / Spouse Name</label><input id="r-fatherOrSpouseName" placeholder="Father or Spouse" /></div>
         <div class="fld"><label for="r-dob">Date of Birth <span class="req">*</span></label><input id="r-dob" placeholder="DD/MM/YYYY" maxlength="10" inputmode="numeric" /></div>
         <div class="fld"><label for="r-mobileNo">Mobile <span class="req">*</span></label>
-          <input id="r-mobileNo" type="tel" placeholder="10-digit mobile" maxlength="10" />
+          <input id="r-mobileNo" type="tel" placeholder="10-digit mobile" />
           <div class="dup-warn" id="dup-r-mobileNo"></div>
         </div>
         <div class="fld opt"><label for="r-email">Email</label><input id="r-email" type="email" placeholder="email@example.com" /></div>
@@ -2616,6 +2631,26 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
 
 <!-- ═══════════════════ PAGE: TEAMS ═══════════════════ -->
 <!-- ═══════════════════ PAGE: CONTROL ROOM ═══════════════════ -->
+<div class="page" id="pg-board">
+  <div class="chk-header">
+    <div>
+      <h2>BOOKING BOARD</h2>
+      <p>Every team, how many people are in it, and whether they are on a booking yet —
+         in one place instead of three. Red means somebody would be left behind.</p>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <div class="search-wrap" style="max-width:190px;">
+        <span class="ico" aria-hidden="true">⌕</span>
+        <input type="text" id="bd-search" placeholder="Find a team…" oninput="bdRender()" aria-label="Find a team" />
+      </div>
+      <button class="nb nb-blue" onclick="bdRefresh()">↻ REFRESH</button>
+    </div>
+  </div>
+  <div class="stats-strip" id="bd-strip" style="display:none;"></div>
+  <div style="padding:0 16px 10px;display:flex;gap:6px;flex-wrap:wrap;" id="bd-filters"></div>
+  <div style="padding:0 16px 28px;"><div id="bd-body"></div></div>
+</div>
+
 <div class="page" id="pg-batch">
   <div class="chk-header">
     <div>
@@ -2694,7 +2729,6 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
         <span class="ico" aria-hidden="true">⌕</span>
         <input type="text" id="ttd-search" placeholder="Search code, name, mobile…" aria-label="Search bookings" />
       </div>
-      <button class="nb nb-ghost" onclick="covOpen()">◫ COVERAGE</button>
       <button class="nb nb-green" onclick="ttdNew()">✚ NEW BOOKING</button>
       <button class="nb nb-blue" onclick="ttdLoad()">↻ REFRESH</button>
     </div>
@@ -2704,17 +2738,6 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
 </div>
 
 <!-- TTD BOOKING EDITOR -->
-<div class="overlay" id="cov-overlay">
-  <div class="modal" style="max-width:860px;" role="dialog" aria-modal="true" aria-label="Booking coverage">
-    <button class="btn-x" onclick="covClose()" title="Close" aria-label="Close">✕</button>
-    <div class="modal-title">BOOKING <span class="hi">COVERAGE</span></div>
-    <p class="bx-note" style="margin:-6px 0 14px;">
-      Who is in the registry but on no booking yet. People are matched by Aadhaar first,
-      then by name, across the lead and everyone travelling with them.</p>
-    <div id="cov-body"></div>
-  </div>
-</div>
-
 <div class="overlay" id="bxph-overlay">
   <div class="modal" style="max-width:760px;" role="dialog" aria-modal="true" aria-label="Choose the photo">
     <button class="btn-x" onclick="bxPhotoClose()" title="Close" aria-label="Close">✕</button>
@@ -2982,7 +3005,7 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
       <div class="fld"><label for="f-gender">Gender <span class="req">*</span></label>
         <select id="f-gender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select>
       </div>
-      <div class="fld"><label for="f-mobileNo">Mobile No <span class="req">*</span></label><input id="f-mobileNo" type="tel" maxlength="10" /><div class="dup-warn" id="dup-f-mobileNo"></div></div>
+      <div class="fld"><label for="f-mobileNo">Mobile No <span class="req">*</span></label><input id="f-mobileNo" type="tel" /><div class="dup-warn" id="dup-f-mobileNo"></div></div>
       <div class="fld"><label for="f-email">Email</label><input id="f-email" type="email" /></div>
       <div class="fld"><label for="f-state">State <span class="req">*</span></label><select id="f-state"><option value="">Select State</option></select></div>
       <div class="fld"><label for="f-district">District</label><input id="f-district" list="dl-district" /></div>
@@ -3656,7 +3679,7 @@ function switchTab(tab) {
   const showSearch = tab==='list';
   document.getElementById('search-bar').style.display = showSearch?'':'none';
   document.getElementById('ai-drawer').classList.remove('open');
-  const pg = {list:'pg-list',detail:'pg-detail',register:'pg-register',checker:'pg-checker',month:'pg-month',teams:'pg-teams',staff:'pg-staff',fast:'pg-fast',ttd:'pg-ttd',control:'pg-control',batch:'pg-batch'}[tab];
+  const pg = {list:'pg-list',detail:'pg-detail',register:'pg-register',checker:'pg-checker',month:'pg-month',teams:'pg-teams',staff:'pg-staff',fast:'pg-fast',ttd:'pg-ttd',control:'pg-control',batch:'pg-batch',board:'pg-board'}[tab];
   if(pg) document.getElementById(pg).classList.add('active');
   if(tab==='month') renderMonth();
   if(tab==='teams') renderTeams();
@@ -3665,6 +3688,7 @@ function switchTab(tab) {
   if(tab==='ttd') ttdEnter();
   if(tab==='control') ctlEnter();
   if(tab==='batch') bxEnter();
+  if(tab==='board') bdEnter();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -5756,6 +5780,30 @@ function bxPaint(c){
   if (/^\d{6}$/.test(String(c.fields.pincode || '').trim())) bxPinInput(c.id);
 }
 
+// The register page builds this from name + DOB on blur. A batch card has no
+// blur to hang it on, so it is built once the scan lands — and has to dodge
+// the other cards in the same batch, which are not saved yet.
+function bxEmailFor(card, fields){
+  const name = String(fields.sevakName || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  if (!name) return '';
+  const p = normDob(fields.dob || '').split('/');
+  const dp = (p.length === 3 && p[2].length === 4) ? p[0] + p[1] + p[2].slice(-2) : '';
+
+  const taken = new Set((allRecords || [])
+    .map(r => String(r.email || '').trim().toLowerCase()).filter(Boolean));
+  bxCards.forEach(o => {
+    if (o === card) return;
+    const el = document.getElementById(`${o.id}-email`);
+    const v = (el ? el.value : o.fields.email || '').trim().toLowerCase();
+    if (v) taken.add(v);
+  });
+
+  const base = name + dp;
+  let addr = `${base}@${AUTO_EMAIL_DOMAIN}`;
+  for (let n = 2; taken.has(addr.toLowerCase()); n++) addr = `${base}${n}@${AUTO_EMAIL_DOMAIN}`;
+  return addr;
+}
+
 function bxStateOptions(sel){
   const canon = [...new Set(Object.values(IN_STATES))].sort((a,b) => a.localeCompare(b));
   if (sel && !canon.some(x => x.toLowerCase() === String(sel).toLowerCase())) canon.unshift(sel);
@@ -6037,6 +6085,10 @@ async function bxScanOne(id, keyIn){
       const canon = canonDistrict(fields.state, fields.district);
       if (canon) fields.district = canon;
     }
+
+    // Same address the register page would have made, and unique against
+    // everything already saved plus everything else in this batch.
+    if (!fields.email) fields.email = bxEmailFor(c, fields);
 
     c.fields = fields;
     c.conf   = out.confidence;
@@ -9865,12 +9917,11 @@ async function ttdDelete(){
 
 
 // ════════════════════════════════════════════
-// BOOKING COVERAGE  (registry ↔ ttd_db)
+// COVERAGE  (registry ↔ ttd_db) — the numbers behind the booking board
 // ════════════════════════════════════════════
-// Bookings are typed in separately from the registry, so a team can be fully
-// registered and still half unbooked with nothing saying so. A ttd_db row is
-// one booking of up to eight people, not one person, so this counts people
-// across the lead and the party rather than comparing row counts.
+// A ttd_db row is one booking of up to eight people, not one person, so this
+// counts people across the lead and the party rather than comparing row
+// counts. The board renders it; these work it out.
 
 // Aadhaar is the reliable key; a name is the fallback when there is none.
 function covKey(aadhaar, name){
@@ -9916,49 +9967,6 @@ function covReport(){
   return { teams: Object.values(teams).sort((a,b) =>
     (b.missing.length - a.missing.length) || a.group.localeCompare(b.group, undefined, {numeric:true})),
     orphan };
-}
-
-function covOpen(){
-  if (!ttdLoaded){ toast('LOADING BOOKINGS FIRST','ok'); ttdLoad().then(covOpen); return; }
-  openOverlay('cov-overlay');
-  covRender();
-}
-function covClose(){ closeOverlay('cov-overlay'); }
-
-function covRender(){
-  const box = document.getElementById('cov-body');
-  const { teams, orphan } = covReport();
-  if (!teams.length && !orphan.length){
-    box.innerHTML = '<div class="chk-empty"><div class="big">NOTHING TO COMPARE</div>' +
-      '<p>Register some people and add some bookings first.</p></div>';
-    return;
-  }
-  const short = (n, list) => list.slice(0, n).map(r =>
-      escHtml([r.sevakName, r.surName].filter(Boolean).join(' ') || r.idNumber || '—')).join(', ')
-    + (list.length > n ? ` +${list.length - n} more` : '');
-
-  box.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;">
-      <div class="stat c1"><div class="v">${teams.length}</div><div class="l">TEAMS</div></div>
-      <div class="stat c2"><div class="v">${teams.reduce((a,t)=>a+t.bookedCount,0)}</div><div class="l">ON A BOOKING</div></div>
-      <div class="stat c3"><div class="v">${teams.reduce((a,t)=>a+t.missing.length,0)}</div><div class="l">NOT YET</div></div>
-      <div class="stat c4"><div class="v">${orphan.length}</div><div class="l">UNKNOWN TEAM</div></div>
-    </div>
-    <div style="max-height:46vh;overflow:auto;">
-    ${teams.map(t => `
-      <div style="display:flex;gap:12px;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line);flex-wrap:wrap;">
-        <strong style="min-width:70px;font-family:'Space Mono',monospace;">${escHtml(t.group)}</strong>
-        <span class="bx-note" style="min-width:150px;">
-          ${t.bookedCount} of ${t.people.length} booked · ${t.rows} booking${t.rows===1?'':'s'}</span>
-        <span class="bx-note" style="flex:1;min-width:180px;color:${t.missing.length?'var(--orange)':'var(--green)'};">
-          ${t.missing.length ? '◆ ' + short(3, t.missing) : '✓ everyone is on a booking'}</span>
-        ${t.missing.length ? `<button class="nb nb-green nb-sm" onclick="covFill('${escAttr(t.group)}')">
-          ✚ BOOK ${t.missing.length}</button>` : ''}
-      </div>`).join('')}
-    ${orphan.length ? `<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--line);">
-      <div class="bx-note" style="color:var(--muted);">Bookings whose team is not in the registry:
-      <strong>${orphan.map(o => escHtml(o.code || '—')).join(', ')}</strong></div></div>` : ''}
-    </div>`;
 }
 
 // Name a generated booking after its lead's own registry code, so pulling it
@@ -10021,13 +10029,157 @@ async function covFill(group){
       made.push(row.code);
     }
     ttdRows.sort((a,b) => String(a.code||'').localeCompare(String(b.code||''), undefined, {numeric:true}));
-    ttdRender(); ctlFillCodes(); covRender();
+    ttdRender(); ctlFillCodes();
+    if (document.getElementById('pg-board')?.classList.contains('active')) bdRender();
     toast(`CREATED ${made.join(', ')}`, 'ok');
   } catch(e){
     toast('COULD NOT CREATE: ' + briefErr(e), 'err');
-    if (made.length) covRender();
+    if (made.length && document.getElementById('pg-board')?.classList.contains('active')) bdRender();
   }
 }
+
+
+// ════════════════════════════════════════════
+// BOOKING BOARD
+// ════════════════════════════════════════════
+// Which team still needs booking, and how many people are in it, used to mean
+// reading the TEAMS tab for sizes, the MONTH tab for who is handling it and
+// the coverage modal for who is on a booking. One row per team, all three.
+
+let bdFilter = 'all', bdOpen = null;
+
+const BD_FILTERS = [
+  ['all',    'ALL TEAMS'],
+  ['gap',    'SOMEONE LEFT OUT'],
+  ['none',   'NOTHING BOOKED'],
+  ['nostaff','NOBODY ASSIGNED'],
+  ['ready',  'READY']
+];
+
+function bdEnter(){
+  if (!ttdLoaded && SB_URL){ ttdLoad().then(() => bdRender()); }
+  bdRender();
+}
+
+async function bdRefresh(){
+  try { await ttdLoad(); } catch(_){}
+  try { await fetchAll(); } catch(_){}
+  bdRender();
+}
+
+// One row's worth of truth about a team.
+function bdRows(){
+  const covered = covBooked();                 // group -> Set(person key)
+  const month = thisMonthKey();
+  return buildTeams().filter(t => t.real).map(t => {
+    const have = covered[t.code.toUpperCase()] || new Set();
+    const missing = t.members.filter(r =>
+      !have.has(covKey(r.idNumber, [r.sevakName, r.surName].filter(Boolean).join(' '))));
+    const rows = (ttdRows || []).filter(x => codeGroup(x.code).toUpperCase() === t.code.toUpperCase());
+    const staff = (typeof staffOfTeam === 'function') ? staffOfTeam(t.code, month) : null;
+    const state = !rows.length ? 'none' : missing.length ? 'gap' : 'ready';
+    return { team: t, people: t.members.length, missing, rows: rows.length, staff, state };
+  }).sort((a, b) =>
+    (b.missing.length - a.missing.length) ||
+    (a.rows - b.rows) ||
+    a.team.name.localeCompare(b.team.name, undefined, { numeric: true }));
+}
+
+function bdMatch(r){
+  if (bdFilter === 'gap')     return r.missing.length > 0 && r.rows > 0;
+  if (bdFilter === 'none')    return r.rows === 0;
+  if (bdFilter === 'nostaff') return !r.staff;
+  if (bdFilter === 'ready')   return r.state === 'ready';
+  return true;
+}
+
+function bdRender(){
+  const body = document.getElementById('bd-body');
+  if (!body) return;
+  const all = bdRows();
+  const q = (document.getElementById('bd-search')?.value || '').trim().toLowerCase();
+
+  const people   = all.reduce((a, r) => a + r.people, 0);
+  const notYet   = all.reduce((a, r) => a + r.missing.length, 0);
+  const nothing  = all.filter(r => r.rows === 0).length;
+  const noStaff  = all.filter(r => !r.staff).length;
+
+  const strip = document.getElementById('bd-strip');
+  strip.style.display = all.length ? '' : 'none';
+  strip.innerHTML = `
+    <div class="stat c1"><div class="v">${all.length}</div><div class="l">TEAMS</div></div>
+    <div class="stat c2"><div class="v">${people - notYet}</div><div class="l">ON A BOOKING</div></div>
+    <div class="stat c3"><div class="v">${notYet}</div><div class="l">NOT YET</div></div>
+    <div class="stat c4"><div class="v">${nothing}</div><div class="l">NOTHING BOOKED</div></div>`;
+  const badge = document.getElementById('tc-board');
+  if (badge) badge.textContent = notYet;
+
+  const counts = { all: all.length, gap: all.filter(r => r.missing.length && r.rows).length,
+                   none: nothing, nostaff: noStaff, ready: all.filter(r => r.state === 'ready').length };
+  document.getElementById('bd-filters').innerHTML = BD_FILTERS.map(([k, label]) =>
+    `<button class="nb nb-sm ${bdFilter===k?'nb-purple':'nb-ghost'}" onclick="bdSetFilter('${k}')">
+      ${label} <span style="opacity:.7;">${counts[k]}</span></button>`).join('');
+
+  const rows = all.filter(bdMatch).filter(r => !q ||
+    r.team.name.toLowerCase().includes(q) || r.team.code.toLowerCase().includes(q));
+
+  if (!all.length){
+    body.innerHTML = `<div class="chk-empty"><div class="big">NO TEAMS YET</div>
+      <p>Register someone with a code and their team appears here.</p></div>`;
+    return;
+  }
+  if (!rows.length){
+    body.innerHTML = `<div class="chk-empty"><div class="big">NOTHING MATCHES</div>
+      <p>No team fits that filter.</p></div>`;
+    return;
+  }
+
+  const chip = (txt, bg, fg) => `<span class="bx-chip" style="background:${bg};color:${fg};">${txt}</span>`;
+  body.innerHTML = rows.map(r => {
+    const open = bdOpen === r.team.code;
+    const pct = r.people ? Math.round(((r.people - r.missing.length) / r.people) * 100) : 0;
+    const state = r.state === 'none'  ? chip('NOTHING BOOKED', 'var(--red)', '#fff')
+                : r.state === 'gap'   ? chip(r.missing.length + ' LEFT OUT', 'var(--orange)', '#3a2400')
+                                      : chip('READY', 'var(--green)', '#052e16');
+    return `
+    <div class="bd-row${open ? ' open' : ''}">
+      <div class="bd-main" onclick="bdToggle('${escAttr(r.team.code)}')">
+        <div style="min-width:112px;">
+          <strong style="font-size:14px;">${escHtml(r.team.name)}</strong>
+          <div class="bx-note">${escHtml(r.team.range)}</div>
+        </div>
+        <div style="min-width:74px;">
+          <strong style="font-size:16px;">${r.people}</strong>
+          <div class="bx-note">${r.people === 1 ? 'person' : 'people'}</div>
+        </div>
+        <div style="flex:1;min-width:140px;">
+          <div class="bd-bar"><span style="width:${pct}%;background:${
+            r.state==='ready'?'var(--green)':r.state==='gap'?'var(--orange)':'var(--red)'};"></span></div>
+          <div class="bx-note">${r.people - r.missing.length} of ${r.people} on a booking
+            · ${r.rows} booking${r.rows === 1 ? '' : 's'}</div>
+        </div>
+        <div style="min-width:118px;">
+          <div class="bx-note">this month</div>
+          <strong style="font-size:12.5px;color:${r.staff?'var(--fg)':'var(--orange)'};">
+            ${r.staff ? escHtml(r.staff.name) : 'nobody assigned'}</strong>
+        </div>
+        ${state}
+        ${r.missing.length ? `<button class="nb nb-green nb-sm"
+            onclick="event.stopPropagation();covFill('${escAttr(r.team.code)}')">✚ BOOK ${r.missing.length}</button>` : ''}
+        <span class="bx-note" style="width:14px;text-align:center;">${open ? '▾' : '▸'}</span>
+      </div>
+      ${open ? `<div class="bd-people">${r.team.members.map(m => {
+          const out = r.missing.includes(m);
+          return `<span class="bd-person${out ? ' out' : ''}"
+            title="${out ? 'not on any booking' : 'on a booking'}">
+            ${escHtml(String(m.code || '').trim())} ${escHtml([m.sevakName, m.surName].filter(Boolean).join(' '))}
+          </span>`; }).join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function bdSetFilter(k){ bdFilter = k; bdRender(); }
+function bdToggle(code){ bdOpen = (bdOpen === code) ? null : code; bdRender(); }
 
 // ════════════════════════════════════════════
 // MERGE TWO TEAMS
@@ -11728,6 +11880,12 @@ document.getElementById('auth-form').addEventListener('submit', doSignIn);
 bootAuth();
 populateStateSelects();   // the dropdown must work before anyone connects
 loadGeo();
+// These were written for "the register page, the edit modal and each bulk
+// person" and then never called from anywhere, so none of it ran: the email
+// never generated itself, names kept their ALL CAPS, +91 stayed on mobiles,
+// Aadhaar kept its spaces and the fields never advanced on their own.
+wireEntryHelpers(f => document.getElementById('r-' + f));
+wireEntryHelpers(f => document.getElementById('f-' + f));
 switchTab('list');
 
 // ════════════════════════════════════════════
@@ -13692,7 +13850,9 @@ function renderMonth(){
   const body = document.getElementById('month-body');
   const strip = document.getElementById('month-strip');
   const opts = monthOptions();
-  const keep = sel.value && opts.includes(sel.value) ? sel.value : opts[0];
+  // monthOptions() runs a year into the future and is sorted newest first, so
+  // opts[0] is next October, not this one. Open on the month we are in.
+  const keep = sel.value && opts.includes(sel.value) ? sel.value : thisMonthKey();
   sel.innerHTML = opts.map(k => `<option value="${k}"${k===keep?' selected':''}>${escHtml(monthLabel(k))}</option>`).join('');
   const key = sel.value = keep;
 
