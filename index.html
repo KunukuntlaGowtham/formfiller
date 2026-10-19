@@ -1982,7 +1982,14 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
 .bx-th img{width:100%;height:100%;object-fit:cover;display:block;}
 .bx-th button{position:absolute;top:1px;right:1px;width:15px;height:15px;line-height:13px;padding:0;
   border:none;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;font-size:10px;cursor:pointer;}
-.bx-face{width:52px;height:52px;border-radius:8px;object-fit:cover;border:2px solid var(--green);}
+.bx-th.src{outline:2px solid var(--green);outline-offset:1px;}
+.bx-photo{display:flex;gap:11px;align-items:center;margin-top:11px;padding:9px 10px;
+  border-radius:12px;background:rgba(0,193,106,.07);border:1px solid rgba(0,193,106,.28);}
+.bx-ph-box{width:62px;height:74px;border-radius:9px;overflow:hidden;flex-shrink:0;
+  border:2px solid var(--green);background:var(--surface);}
+.bx-ph-box img{width:100%;height:100%;object-fit:cover;display:block;}
+.bx-ph-none{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  font-size:9.5px;color:var(--muted);text-align:center;line-height:1.3;}
 .bx-fields{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:11px;}
 .bx-fields .fld{margin:0;}
 .bx-fields .fld.wide{grid-column:1/-1;}
@@ -2618,7 +2625,8 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
     <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
       <div class="fld" style="margin:0;min-width:130px;">
         <label for="bx-code">Team code for all</label>
-        <input id="bx-code" placeholder="e.g. KSS1" spellcheck="false" oninput="bxPaintAll()" />
+        <input id="bx-code" placeholder="e.g. KSS1" spellcheck="false" list="dl-code" oninput="bxPaintAll()" />
+        <div class="bx-note" id="bx-code-note" style="margin-top:3px;"></div>
       </div>
       <button class="nb nb-ghost" onclick="bxAdd(1)">✚ ADD PERSON</button>
       <button class="nb nb-blue"  id="bx-scan" onclick="bxScanAll()">🔍 SCAN ALL</button>
@@ -2693,6 +2701,36 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
 </div>
 
 <!-- TTD BOOKING EDITOR -->
+<div class="overlay" id="bxph-overlay">
+  <div class="modal" style="max-width:760px;" role="dialog" aria-modal="true" aria-label="Choose the photo">
+    <button class="btn-x" onclick="bxPhotoClose()" title="Close" aria-label="Close">✕</button>
+    <div class="modal-title">CHOOSE THE <span class="hi">PHOTO</span></div>
+    <p class="bx-note" style="margin:-6px 0 12px;">
+      Purple boxes are the faces the model found. Tap one to use it, or drag a box of your own
+      anywhere on the image. Switch images with the strip underneath.</p>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">
+      <div id="bxph-stage" style="flex:1;min-width:280px;">
+        <canvas id="bxph-canvas" style="max-width:100%;border-radius:10px;border:1px solid var(--line);
+                touch-action:none;cursor:crosshair;display:block;"
+                onpointerdown="bxPhotoDown(event)" onpointermove="bxPhotoMove(event)"
+                onpointerup="bxPhotoUp(event)" onpointercancel="bxPhotoUp(event)"></canvas>
+        <div class="bx-note" id="bxph-count" style="margin-top:6px;"></div>
+        <div class="bx-thumbs" id="bxph-rail" style="margin-top:8px;"></div>
+      </div>
+      <div style="width:150px;">
+        <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1.4px;color:var(--muted);margin-bottom:6px;">USING NOW</div>
+        <div id="bxph-current"></div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px;">
+          <button class="nb nb-green nb-sm" id="bxph-use" disabled onclick="bxPhotoUse(null)">✓ USE MY BOX</button>
+          <button class="nb nb-ghost nb-sm" onclick="bxPhotoWhole()">⬚ WHOLE IMAGE</button>
+          <button class="nb nb-ghost nb-sm" onclick="bxPhotoNone()">✕ NO PHOTO</button>
+          <button class="nb nb-blue nb-sm" onclick="bxPhotoClose()">DONE</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="ttd-overlay">
   <div class="modal" style="max-width:760px;" role="dialog" aria-modal="true" aria-label="TTD booking">
     <button class="btn-x" onclick="ttdClose()" title="Close" aria-label="Close">✕</button>
@@ -5487,6 +5525,7 @@ function bxRender(){
       el.innerHTML = `<div class="bx-head"></div>
         <div class="bx-drop" id="${c.id}-drop">⬇ drop this person's images here<br><span style="font-size:10px;">form · ID · photo — or click to pick</span></div>
         <div class="bx-thumbs" id="${c.id}-thumbs"></div>
+        <div class="bx-photo" id="${c.id}-photo" style="display:none;"></div>
         <div id="${c.id}-body"></div>`;
       box.appendChild(el);
       bxWireDrop(c.id);
@@ -5546,7 +5585,8 @@ function bxDropImage(id, i){
 
 // ── painting ──────────────────────────────────────────────────────────────
 const BX_CHIP = { empty:['', 'no images'], ready:['', 'ready'], busy:['busy','reading…'],
-                  done:['done','scanned'], err:['err','failed'], saved:['done','saved'] };
+                  done:['done','scanned'], err:['err','failed'], saved:['done','saved'],
+                  blank:['err','read nothing'] };
 
 function bxPaint(c){
   const el = document.getElementById(c.id); if (!el) return;
@@ -5563,9 +5603,28 @@ function bxPaint(c){
     <button class="mini-btn" title="Remove" onclick="bxRemove('${c.id}')">✕</button>`;
 
   document.getElementById(c.id + '-thumbs').innerHTML =
-    c.images.map((im, i) => `<div class="bx-th"><img src="${im.thumb}" alt="page ${i+1}" />
-      <button title="Remove" onclick="bxDropImage('${c.id}',${i})">✕</button></div>`).join('') +
-    (c.face ? `<img class="bx-face" src="${c.face}" alt="chosen photo" title="${escAttr(c.faceNote)}" />` : '');
+    c.images.map((im, i) => `<div class="bx-th${i === c.faceFrom ? ' src' : ''}"
+      title="${i === c.faceFrom ? 'the photo was cropped from this one' : escAttr(im.name || '')}">
+      <img src="${im.thumb}" alt="image ${i+1}" />
+      <button title="Remove" onclick="bxDropImage('${c.id}',${i})">✕</button></div>`).join('');
+
+  // Which photo it chose, big enough to judge, and one click to change it.
+  const ph = document.getElementById(c.id + '-photo');
+  if (ph){
+    const scanned = c.status === 'done' || c.status === 'saved' || c.status === 'blank';
+    ph.style.display = (c.images.length && scanned) ? '' : 'none';
+    ph.innerHTML = `
+      <div class="bx-ph-box">
+        ${c.face ? `<img src="${c.face}" alt="chosen photo" />`
+                 : `<div class="bx-ph-none">no<br>photo</div>`}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:1.4px;color:var(--muted);">PHOTO</div>
+        <div class="bx-note" style="margin:2px 0 6px;">${escHtml(c.faceNote || '—')}</div>
+        <button class="nb nb-ghost nb-sm" onclick="bxPhotoOpen('${c.id}')">
+          ${c.face ? '✎ CHANGE' : '✎ CHOOSE'}</button>
+      </div>`;
+  }
 
   const body = document.getElementById(c.id + '-body');
   if (c.status === 'err'){
@@ -5573,11 +5632,30 @@ function bxPaint(c){
       <div class="bx-foot"><button class="nb nb-ghost nb-sm" onclick="bxScanOne('${c.id}')">↻ TRY AGAIN</button></div>`;
     return;
   }
-  if (c.status !== 'done' && c.status !== 'saved'){
+  if (c.status === 'blank' && body.dataset.form !== c.id){
+    body.innerHTML = `<div class="bx-note" style="color:var(--red);margin:10px 0;">
+        ❌ The model read nothing usable from these images. Usually the form page is
+        missing, too dark, or at too steep an angle — add a clearer page and scan again.</div>
+      <div class="bx-foot">
+        <button class="nb nb-blue nb-sm" onclick="bxScanOne('${c.id}')">↻ SCAN AGAIN</button>
+        <button class="nb nb-ghost nb-sm" onclick="bxTypeIt('${c.id}')">✎ TYPE IT IN</button>
+      </div>`;
+    return;
+  }
+  if (c.status === 'busy'){
+    // Without this the old form sat there untouched for the whole scan, so a
+    // rescan that returned the same answer looked like a dead button.
+    body.dataset.form = 'busy';
+    body.innerHTML = `<div class="bx-note" style="margin:12px 0;display:flex;gap:8px;align-items:center;">
+      <span class="spinner"></span> reading this card…</div>`;
+    return;
+  }
+  if (c.status !== 'done' && c.status !== 'saved' && c.status !== 'blank'){
     if (body.dataset.form) { body.innerHTML = ''; delete body.dataset.form; }
     return;
   }
   if (body.dataset.form === c.id) { bxPaintFoot(c); return; }   // keep edits
+  if (c.status === 'blank') return;
 
   body.dataset.form = c.id;
   const low = k => (c.conf[k] != null && c.conf[k] < BX_LOW) ? ' low' : '';
@@ -5587,10 +5665,51 @@ function bxPaint(c){
     if (k === 'gender') return `<div class="${cls}"><label for="${id}">Gender</label>
       <select id="${id}"><option value="">—</option>
       ${['Male','Female','Other'].map(g => `<option${v===g?' selected':''}>${g}</option>`).join('')}</select></div>`;
+    if (k === 'code') return `<div class="${cls}"><label for="${id}">Team code</label>
+      <input id="${id}" value="${escAttr(v)}" spellcheck="false" list="dl-code"
+             oninput="bxCodeNote('${c.id}')" />
+      <div class="bx-note" id="${id}-note" style="margin-top:3px;"></div></div>`;
     return `<div class="${cls}"><label for="${id}">${escHtml(bxNice(k))}</label>
       <input id="${id}" value="${escAttr(v)}" spellcheck="false" /></div>`;
   }).join('') + `</div><div class="bx-foot"></div>`;
   bxPaintFoot(c);
+  bxCodeNote(c.id);
+}
+
+// "How do I check the codes?" — say what this code already is. A code nobody
+// has used is usually a typo, and a name already sitting in that team is
+// usually the same person being registered twice.
+function bxCodeNote(cardId){
+  const c = bxCard(cardId); if (!c) return;
+  const el   = document.getElementById(`${cardId}-code`);
+  const note = document.getElementById(`${cardId}-code-note`);
+  if (!el || !note) return;
+  const code = el.value.trim().toUpperCase();
+  if (!code){ note.textContent = ''; note.style.color = 'var(--muted)'; return; }
+
+  const team = allRecords.filter(r => String(r.code || '').trim().toUpperCase() === code);
+  const nm   = (document.getElementById(`${cardId}-sevakName`)?.value || '').trim();
+  const dup  = nm && team.find(r => nameKey([r.sevakName, r.surName].filter(Boolean).join(' ')) === nameKey(nm));
+
+  if (dup){
+    note.textContent = `⚠ ${nm} is already in ${code}`;
+    note.style.color = 'var(--red)';
+  } else if (!team.length){
+    note.textContent = `new code — nobody is in ${code} yet`;
+    note.style.color = 'var(--orange)';
+  } else {
+    note.textContent = `${team.length} already in ${code}`;
+    note.style.color = 'var(--muted)';
+  }
+}
+
+// Give up on the model for this one and open an empty form to type into.
+function bxTypeIt(id){
+  const c = bxCard(id); if (!c) return;
+  c.status = 'done';
+  const body = document.getElementById(c.id + '-body');
+  if (body) delete body.dataset.form;
+  bxPaint(c); bxStrip();
 }
 
 function bxNice(k){
@@ -5670,6 +5789,25 @@ async function bxScanAll(){
   toast(`SCANNED ${done} FORMS`, failed ? 'warn' : 'ok');
 }
 
+// Asking for {fields,confidence,photos} does not guarantee getting it. The
+// model quite often answers with the fourteen keys at the top level instead,
+// and the wrapper lookup then found nothing — which is how a card could come
+// back green and completely blank. Accept either shape.
+function bxShape(raw){
+  let o = raw;
+  if (Array.isArray(o)) o = o[0] || {};
+  if (!o || typeof o !== 'object') return { fields:{}, confidence:{}, photos:[] };
+  const flat = BX_FIELDS.some(k => Object.prototype.hasOwnProperty.call(o, k));
+  const fields = (o.fields && typeof o.fields === 'object') ? o.fields : (flat ? o : {});
+  return {
+    fields,
+    confidence: (o.confidence && typeof o.confidence === 'object') ? o.confidence : {},
+    photos: Array.isArray(o.photos) ? o.photos
+          : Array.isArray(o.faces)  ? o.faces
+          : (o.photo ? [o.photo] : [])
+  };
+}
+
 // A card is "shaky" when something required is missing or barely legible.
 // Those are the only ones worth the slower, dearer model.
 const BX_WEAK = 0.6;
@@ -5685,21 +5823,20 @@ async function bxScanOne(id, keyIn){
   if (!key){ toast('ENTER GEMINI API KEY IN CONFIG','err'); return false; }
 
   c.status = 'busy'; c.error = ''; c.model = '';
-  const body = document.getElementById(c.id + '-body');
-  if (body) delete body.dataset.form;                 // a rescan replaces the form
-  bxPaint(c);
+  bxPaint(c);                       // shows "reading this card…" in place of the form
+  bxStrip();
 
   try {
     const imgs = c.images.map(i => i.vision);
-    let out = parseGeminiJson(await geminiMulti(key, imgs, BX_PROMPT, 4096, BX_FAST));
-    let f = (out && out.fields) || {};
+    let out = bxShape(parseGeminiJson(await geminiMulti(key, imgs, BX_PROMPT, 4096, BX_FAST)));
+    let f = out.fields;
 
     // Flash handles clean paperwork. When it comes back unsure about something
     // the registration cannot do without, pay for one Pro read of that card
     // rather than making someone type the whole form.
     if (bxShaky(f, (out && out.confidence) || {})){
       try {
-        const better = parseGeminiJson(await geminiMulti(key, imgs, BX_PROMPT, 4096, BX_SURE));
+        const better = bxShape(parseGeminiJson(await geminiMulti(key, imgs, BX_PROMPT, 4096, BX_SURE)));
         if (better && better.fields){
           const bf = better.fields, bc = better.confidence || {}, oc = (out.confidence) || {};
           Object.keys(bf).forEach(k => {
@@ -5725,15 +5862,21 @@ async function bxScanOne(id, keyIn){
       if (k === 'idNumber') v = normalizeAadhaar(v);
       fields[k] = v;
     });
-    fields.sevakName = mergeSevakName(f.sevakName, f.surName) || fields.sevakName || '';
+    // Assigning '' here would create the key and make a card that read nothing
+    // look like it read a name.
+    const merged = mergeSevakName(f.sevakName, f.surName);
+    if (merged) fields.sevakName = merged;
     // The team code is the operator's call, never the model's.
     fields.code = (document.getElementById('bx-code').value || '').trim().toUpperCase()
                || c.fields.code || '';
 
     c.fields = fields;
-    c.conf   = (out && out.confidence) || {};
-    await bxChooseFace(c, out && out.photos);
-    c.status = 'done';
+    c.conf   = out.confidence;
+    c.photos = (out.photos || []).filter(x => x && c.images[x.image] && +x.w > 8 && +x.h > 8);
+    await bxChooseFace(c);
+    // A blank read is not a success. Saying so is the difference between
+    // "check these two fields" and silently filing an empty person.
+    c.status = BX_FIELDS.some(k => k !== 'code' && String(fields[k] || '').trim()) ? 'done' : 'blank';
     bxPaint(c); bxStrip();
     return true;
   } catch(e){
@@ -5747,10 +5890,9 @@ async function bxScanOne(id, keyIn){
 // are two, take the best." The model lists every face it finds with a quality
 // score — a standalone portrait is worth more than the same face printed small
 // on an ID, so it gets a thumb on the scale before we take the highest.
-async function bxChooseFace(c, photos){
-  c.face = null; c.faceNote = '';
-  const list = (Array.isArray(photos) ? photos : []).filter(p =>
-    p && c.images[p.image] && +p.w > 8 && +p.h > 8);
+async function bxChooseFace(c){
+  c.face = null; c.faceNote = ''; c.faceFrom = -1;
+  const list = c.photos || [];
   if (!list.length){ c.faceNote = 'no photo found'; return; }
 
   const score = p => {
@@ -5759,24 +5901,162 @@ async function bxChooseFace(c, photos){
     return (+p.quality || 0) + (p.kind === 'portrait' ? 0.25 : 0) + Math.min(0.15, area * 1.5);
   };
   const best = list.slice().sort((a, b) => score(b) - score(a))[0];
+  await bxCropTo(c, best.image, best, (best.kind === 'portrait' ? 'photo' : 'face off the document')
+                                      + (list.length > 1 ? ` · best of ${list.length}` : ''));
+}
 
+// Crop a box — in the coordinates the model was shown — out of the full
+// resolution original, which is the only copy with detail worth keeping.
+async function bxCropTo(c, imageIdx, box, note, whole){
+  const img = c.images[imageIdx];
+  if (!img) return false;
   try {
-    const img = c.images[best.image];
-    const src = await loadImg(img.raw);                  // crop from full resolution
-    const sx = src.width / img.vision.w, sy = src.height / img.vision.h;
-    const pad = 0.08;
-    let x = (+best.x - +best.w * pad) * sx, y = (+best.y - +best.h * pad) * sy;
-    let w = (+best.w * (1 + pad * 2)) * sx, h = (+best.h * (1 + pad * 2)) * sy;
-    x = Math.max(0, Math.round(x)); y = Math.max(0, Math.round(y));
-    w = Math.min(src.width - x, Math.round(w)); h = Math.min(src.height - y, Math.round(h));
+    const src = await loadImg(img.raw);
+    let x, y, w, h;
+    if (whole){ x = 0; y = 0; w = src.width; h = src.height; }
+    else {
+      const sx = src.width / img.vision.w, sy = src.height / img.vision.h;
+      const pad = 0.08;
+      x = (+box.x - +box.w * pad) * sx; y = (+box.y - +box.h * pad) * sy;
+      w = (+box.w * (1 + pad*2)) * sx;  h = (+box.h * (1 + pad*2)) * sy;
+      x = Math.max(0, Math.round(x)); y = Math.max(0, Math.round(y));
+      w = Math.min(src.width - x, Math.round(w)); h = Math.min(src.height - y, Math.round(h));
+    }
     if (w < 8 || h < 8) throw new Error('box too small');
     const cv = document.createElement('canvas');
     cv.width = w; cv.height = h;
     cv.getContext('2d').drawImage(src, x, y, w, h, 0, 0, w, h);
     c.face = cv.toDataURL('image/jpeg', 0.92);
-    c.faceNote = (best.kind === 'portrait' ? 'photo' : 'face from the document')
-               + (list.length > 1 ? ` · best of ${list.length}` : '');
-  } catch(_){ c.faceNote = 'could not crop the photo'; }
+    c.faceFrom = imageIdx;
+    c.faceNote = note || `cropped from image ${imageIdx + 1}`;
+    return true;
+  } catch(_){ c.faceNote = 'could not crop the photo'; return false; }
+}
+
+// ── which photo, and is it the right one ──────────────────────────────────
+// A 52px tile next to four other 52px tiles answers neither question, so the
+// crop gets its own panel and a chooser: every source image at a size you can
+// actually judge, every face the model found drawn on it, and a box you can
+// drag yourself when it picked wrong.
+let bxPh = null;
+
+function bxPhotoOpen(cardId){
+  const c = bxCard(cardId);
+  if (!c || !c.images.length) return;
+  bxPh = { cardId, idx: Math.max(0, c.faceFrom), drag: null, box: null };
+  openOverlay('bxph-overlay');
+  bxPhotoShow(bxPh.idx);
+}
+
+function bxPhotoClose(){ bxPh = null; closeOverlay('bxph-overlay'); }
+
+async function bxPhotoShow(i){
+  const c = bxCard(bxPh.cardId); if (!c) return;
+  bxPh.idx = i; bxPh.box = null;
+  const img = c.images[i];
+  const el = await loadImg(img.vision.dataUrl);
+  bxPh.img = el;
+  const cv = document.getElementById('bxph-canvas');
+  const wrap = document.getElementById('bxph-stage');
+  const maxW = Math.min(wrap.clientWidth || 640, 640), maxH = 460;
+  const r = Math.min(maxW / el.width, maxH / el.height, 1);
+  cv.width = Math.round(el.width * r); cv.height = Math.round(el.height * r);
+  bxPh.scale = r;
+  bxPhotoDraw();
+
+  document.getElementById('bxph-rail').innerHTML = c.images.map((im, n) =>
+    `<div class="bx-th" style="${n===i?'outline:2px solid var(--accent);':''}cursor:pointer;"
+      onclick="bxPhotoShow(${n})"><img src="${im.thumb}" alt="image ${n+1}" /></div>`).join('');
+  document.getElementById('bxph-count').textContent =
+    `image ${i+1} of ${c.images.length} · ${(c.photos||[]).filter(p=>p.image===i).length} face(s) detected here`;
+  document.getElementById('bxph-current').innerHTML = c.face
+    ? `<img src="${c.face}" alt="current crop" style="max-width:110px;max-height:130px;border-radius:10px;border:2px solid var(--green);" />`
+    : '<span class="bx-note">nothing chosen yet</span>';
+}
+
+function bxPhotoDraw(){
+  const c = bxCard(bxPh.cardId); if (!c || !bxPh.img) return;
+  const cv = document.getElementById('bxph-canvas'), x = cv.getContext('2d');
+  x.clearRect(0,0,cv.width,cv.height);
+  x.drawImage(bxPh.img, 0, 0, cv.width, cv.height);
+  const k = cv.width / c.images[bxPh.idx].vision.w;
+  (c.photos || []).forEach((p, n) => {
+    if (p.image !== bxPh.idx) return;
+    const chosen = c.faceFrom === bxPh.idx && p === bxPh.chosenBox;
+    x.lineWidth = 2;
+    x.strokeStyle = chosen ? '#00C16A' : '#7C5CF0';
+    x.strokeRect(p.x*k, p.y*k, p.w*k, p.h*k);
+    x.fillStyle = chosen ? '#00C16A' : '#7C5CF0';
+    x.fillRect(p.x*k, p.y*k - 15, 58, 15);
+    x.fillStyle = '#fff'; x.font = '10px monospace';
+    x.fillText(`${p.kind||'face'} ${Math.round((+p.quality||0)*100)}%`, p.x*k + 3, p.y*k - 4);
+  });
+  if (bxPh.box){
+    const b = bxPh.box;
+    x.setLineDash([5,4]); x.strokeStyle = '#F59E0B'; x.lineWidth = 2;
+    x.strokeRect(b.x, b.y, b.w, b.h); x.setLineDash([]);
+  }
+}
+
+function bxPhotoPoint(e){
+  const cv = document.getElementById('bxph-canvas'), r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (cv.width / r.width),
+           y: (e.clientY - r.top)  * (cv.height / r.height) };
+}
+
+function bxPhotoDown(e){
+  const c = bxCard(bxPh.cardId); if (!c) return;
+  const pt = bxPhotoPoint(e);
+  const k = document.getElementById('bxph-canvas').width / c.images[bxPh.idx].vision.w;
+  // a tap inside a detected box takes it; anywhere else starts a box of your own
+  const hit = (c.photos || []).find(p => p.image === bxPh.idx &&
+    pt.x >= p.x*k && pt.x <= (p.x+p.w)*k && pt.y >= p.y*k && pt.y <= (p.y+p.h)*k);
+  if (hit){ bxPhotoUse(hit); return; }
+  bxPh.drag = { x0: pt.x, y0: pt.y };
+  // Capture is a nicety — a pointer the browser has already released (or a
+  // synthetic one) throws, and that must not take the drag down with it.
+  try { e.target.setPointerCapture?.(e.pointerId); } catch(_){}
+}
+
+function bxPhotoMove(e){
+  if (!bxPh || !bxPh.drag) return;
+  const pt = bxPhotoPoint(e);
+  bxPh.box = { x: Math.min(bxPh.drag.x0, pt.x), y: Math.min(bxPh.drag.y0, pt.y),
+               w: Math.abs(pt.x - bxPh.drag.x0), h: Math.abs(pt.y - bxPh.drag.y0) };
+  bxPhotoDraw();
+}
+
+function bxPhotoUp(){
+  if (!bxPh) return;
+  bxPh.drag = null;
+  document.getElementById('bxph-use').disabled = !(bxPh.box && bxPh.box.w > 12 && bxPh.box.h > 12);
+}
+
+async function bxPhotoUse(hit){
+  const c = bxCard(bxPh.cardId); if (!c) return;
+  bxPh.chosenBox = hit || null;
+  if (hit) await bxCropTo(c, bxPh.idx, hit,
+    (hit.kind === 'portrait' ? 'photo' : 'face off the document') + ` · image ${bxPh.idx+1}, you picked it`);
+  else {
+    const k = document.getElementById('bxph-canvas').width / c.images[bxPh.idx].vision.w;
+    const b = bxPh.box;
+    await bxCropTo(c, bxPh.idx, { x: b.x/k, y: b.y/k, w: b.w/k, h: b.h/k },
+                   `image ${bxPh.idx+1}, cropped by hand`);
+  }
+  bxPaint(c); bxPhotoShow(bxPh.idx);
+  toast('PHOTO UPDATED','ok');
+}
+
+async function bxPhotoWhole(){
+  const c = bxCard(bxPh.cardId); if (!c) return;
+  await bxCropTo(c, bxPh.idx, null, `image ${bxPh.idx+1}, whole image`, true);
+  bxPaint(c); bxPhotoShow(bxPh.idx);
+}
+
+function bxPhotoNone(){
+  const c = bxCard(bxPh.cardId); if (!c) return;
+  c.face = null; c.faceFrom = -1; c.faceNote = 'no photo';
+  bxPaint(c); bxPhotoShow(bxPh.idx);
 }
 
 // ── saving ────────────────────────────────────────────────────────────────
@@ -5792,11 +6072,16 @@ function bxCollect(c){
 
 function bxPaintAll(){
   const code = (document.getElementById('bx-code').value || '').trim().toUpperCase();
+  const note = document.getElementById('bx-code-note');
+  if (note){
+    const n = code ? allRecords.filter(r => String(r.code||'').trim().toUpperCase() === code).length : 0;
+    note.textContent = !code ? '' : n ? `${n} already in ${code}` : `new code — nobody is in ${code} yet`;
+    note.style.color = !code || n ? 'var(--muted)' : 'var(--orange)';
+  }
   if (!code) return;
   bxCards.forEach(c => {
-    if (c.status !== 'done') return;
     const el = document.getElementById(`${c.id}-code`);
-    if (el && !el.value.trim()) el.value = code;
+    if (el && !el.value.trim()){ el.value = code; bxCodeNote(c.id); }
   });
 }
 
