@@ -5665,6 +5665,14 @@ function bxPaint(c){
     if (k === 'gender') return `<div class="${cls}"><label for="${id}">Gender</label>
       <select id="${id}"><option value="">—</option>
       ${['Male','Female','Other'].map(g => `<option${v===g?' selected':''}>${g}</option>`).join('')}</select></div>`;
+    if (k === 'state') return `<div class="${cls}"><label for="${id}">State</label>
+      <select id="${id}" onchange="bxStateChanged('${c.id}')">${bxStateOptions(v)}</select></div>`;
+    if (k === 'district') return `<div class="${cls}"><label for="${id}">District</label>
+      <select id="${id}">${bxDistrictOptions(c.fields.state, v)}</select></div>`;
+    if (k === 'pincode') return `<div class="${cls}"><label for="${id}">Pincode</label>
+      <input id="${id}" value="${escAttr(v)}" inputmode="numeric" maxlength="6"
+             oninput="bxPinInput('${c.id}')" />
+      <div class="bx-note" id="${id}-note" style="margin-top:3px;"></div></div>`;
     if (k === 'code') return `<div class="${cls}"><label for="${id}">Team code</label>
       <input id="${id}" value="${escAttr(v)}" spellcheck="false" list="dl-code"
              oninput="bxCodeNote('${c.id}')" />
@@ -5674,6 +5682,79 @@ function bxPaint(c){
   }).join('') + `</div><div class="bx-foot"></div>`;
   bxPaintFoot(c);
   bxCodeNote(c.id);
+  if (/^\d{6}$/.test(String(c.fields.pincode || '').trim())) bxPinInput(c.id);
+}
+
+function bxStateOptions(sel){
+  const canon = [...new Set(Object.values(IN_STATES))].sort((a,b) => a.localeCompare(b));
+  if (sel && !canon.some(x => x.toLowerCase() === String(sel).toLowerCase())) canon.unshift(sel);
+  return '<option value="">—</option>' + canon.map(x =>
+    `<option${String(sel||'').toLowerCase()===x.toLowerCase()?' selected':''} value="${escAttr(x)}">${escHtml(x)}</option>`).join('');
+}
+
+// Inside Andhra Pradesh or Telangana the list is the booking site's own, so
+// whatever is saved here can actually be selected over there. Elsewhere it
+// stays a free list learnt from the data.
+function bxDistrictOptions(state, sel){
+  const key = ttdStateKey(state);
+  const list = key ? TTD_DISTRICTS[key].slice().sort((a,b) => a.localeCompare(b))
+                   : [...new Set(allRecords.map(r => String(r.district||'').trim()).filter(Boolean))].sort();
+  const canonSel = canonDistrict(state, sel) || sel || '';
+  if (canonSel && !list.includes(canonSel)) list.unshift(canonSel);
+  return '<option value="">—</option>' + list.map(d =>
+    `<option${d===canonSel?' selected':''} value="${escAttr(d)}">${escHtml(d)}</option>`).join('');
+}
+
+function bxStateChanged(cardId){
+  const c = bxCard(cardId); if (!c) return;
+  const st = document.getElementById(`${cardId}-state`)?.value || '';
+  const dEl = document.getElementById(`${cardId}-district`);
+  if (!dEl) return;
+  const keep = dEl.value;
+  dEl.innerHTML = bxDistrictOptions(st, keep);       // re-list for the new state
+}
+
+// Six digits is a better source for state and district than handwriting is,
+// so once one is typed or read we go and check it.
+const _bxPinTimer = {};
+function bxPinInput(cardId){
+  clearTimeout(_bxPinTimer[cardId]);
+  const pin = (document.getElementById(`${cardId}-pincode`)?.value || '').trim();
+  const note = document.getElementById(`${cardId}-pincode-note`);
+  if (!/^\d{6}$/.test(pin)){ if (note) note.textContent = ''; return; }
+  _bxPinTimer[cardId] = setTimeout(() => bxPinFix(cardId, pin), 500);
+}
+
+async function bxPinFix(cardId, pin){
+  const c = bxCard(cardId); if (!c) return;
+  const note = document.getElementById(`${cardId}-pincode-note`);
+  const set = (t, col) => { if (note){ note.textContent = t; note.style.color = col; } };
+  set('⏳ checking…', 'var(--muted)');
+  let api = null;
+  try { api = await lookupPincode(pin); }
+  catch(_){ set('could not check the pincode', 'var(--orange)'); return; }
+  if ((document.getElementById(`${cardId}-pincode`)?.value || '').trim() !== pin) return;
+  if (!api){ set('⚠ no such pincode', 'var(--red)'); return; }
+
+  const stEl = document.getElementById(`${cardId}-state`);
+  const dEl  = document.getElementById(`${cardId}-district`);
+  const changed = [];
+  // Report the spelling we actually stored, not India Post's.
+  const want = canonDistrict(api.state, api.district) || api.district;
+
+  if (stEl && api.state && stEl.value.toLowerCase() !== api.state.toLowerCase()){
+    setFieldValue(stEl, api.state); changed.push('state');
+    stEl.classList.add('ai-fill'); setTimeout(() => stEl.classList.remove('ai-fill'), 4000);
+  }
+  if (dEl){
+    dEl.innerHTML = bxDistrictOptions(api.state || stEl?.value, want);
+    if (dEl.value !== want) setFieldValue(dEl, want);
+    if (normD(want) !== normD(c.fields.district || '')) changed.push('district');
+    dEl.classList.add('ai-fill'); setTimeout(() => dEl.classList.remove('ai-fill'), 4000);
+  }
+  const where = [want, api.state].filter(Boolean).join(', ');
+  set(changed.length ? `✓ ${where} — corrected ${changed.join(' and ')}` : `✓ ${where}`,
+      changed.length ? 'var(--green)' : 'var(--muted)');
 }
 
 // "How do I check the codes?" — say what this code already is. A code nobody
@@ -5687,7 +5768,12 @@ function bxCodeNote(cardId){
   const code = el.value.trim().toUpperCase();
   if (!code){ note.textContent = ''; note.style.color = 'var(--muted)'; return; }
 
-  const team = allRecords.filter(r => String(r.code || '').trim().toUpperCase() === code);
+  // Codes are per person (PSSS1, PSSS2…) while the team is the group (PSSS),
+  // so counting only exact matches called every real team "new".
+  const team = allRecords.filter(r => {
+    const rc = String(r.code || '').trim().toUpperCase();
+    return rc === code || codeGroup(rc).toUpperCase() === code;
+  });
   const nm   = (document.getElementById(`${cardId}-sevakName`)?.value || '').trim();
   const dup  = nm && team.find(r => nameKey([r.sevakName, r.surName].filter(Boolean).join(' ')) === nameKey(nm));
 
@@ -5869,6 +5955,12 @@ async function bxScanOne(id, keyIn){
     // The team code is the operator's call, never the model's.
     fields.code = (document.getElementById('bx-code').value || '').trim().toUpperCase()
                || c.fields.code || '';
+
+    // Whatever the model called the district, store the booking site's spelling.
+    if (fields.district){
+      const canon = canonDistrict(fields.state, fields.district);
+      if (canon) fields.district = canon;
+    }
 
     c.fields = fields;
     c.conf   = out.confidence;
@@ -6074,7 +6166,10 @@ function bxPaintAll(){
   const code = (document.getElementById('bx-code').value || '').trim().toUpperCase();
   const note = document.getElementById('bx-code-note');
   if (note){
-    const n = code ? allRecords.filter(r => String(r.code||'').trim().toUpperCase() === code).length : 0;
+    const n = !code ? 0 : allRecords.filter(r => {
+      const rc = String(r.code||'').trim().toUpperCase();
+      return rc === code || codeGroup(rc).toUpperCase() === code;
+    }).length;
     note.textContent = !code ? '' : n ? `${n} already in ${code}` : `new code — nobody is in ${code} yet`;
     note.style.color = !code || n ? 'var(--muted)' : 'var(--orange)';
   }
@@ -6322,6 +6417,88 @@ Current: state="${state}", district="${district}", city="${city}", pincode="${pi
   btn.disabled=false;
 }
 
+
+// ── the districts the TTD site actually offers ────────────────────────────
+// Exactly as they appear in the booking site's dropdown, lowercase "prakasam"
+// and the en dash in Medchal included. Anything we store that is not one of
+// these cannot be selected by the booking scripts, so the registry has to
+// speak the same list.
+const TTD_DISTRICTS = {
+  'Andhra Pradesh': ['Anantapur','Guntur','Chittoor','Kurnool','Visakhapatnam','Anakapalle',
+    'Eluru','Bapatla','Kakinada','Nandyal','Parvatipuram','Tirupati','Alluri Sitharama Raju',
+    'Annamayya','Dr.B.R.Ambedkar Konaseema','East Godavari','Krishna','NTR','Palnadu','prakasam',
+    'Sri potti sriramulu nellore','Sri Satya sai','West Godavari','YSR','Srikakulam','Vizianagaram'],
+  'Telangana': ['Bhadradri Kothagudem','Jagtial','Jangaon','Jayashankar Bhupalapally',
+    'Jogulamba Gadwal','Kamareddy','Kumarambheem Asifabad','Mahabubabad','Mancherial',
+    'Medchal\u2013Malkajgiri','Nagarkurnool','Nirmal','Peddapalli','Rajanna Sircilla','Sangareddy',
+    'Siddipet','Suryapet','Vikarabad','Wanaparthy','Warangal Urban','Yadadri Bhuvanagiri','Mulugu',
+    'Narayanpet','Warangal Rural','Medak','Hyderabad','Khammam','Karimnagar','Mahabubnagar',
+    'Nalgonda','Nizamabad','RangaReddy','Adilabad']
+};
+
+// India Post, Aadhaar cards and handwriting all use different names for the
+// same district. Everything here resolves to one of the strings above.
+const TTD_DIST_ALIAS = {
+  // Andhra Pradesh
+  kadapa:'YSR', cuddapah:'YSR', ysrkadapa:'YSR', ysrdistrict:'YSR',
+  nellore:'Sri potti sriramulu nellore', spsnellore:'Sri potti sriramulu nellore',
+  spsrnellore:'Sri potti sriramulu nellore', pottisriramulunellore:'Sri potti sriramulu nellore',
+  konaseema:'Dr.B.R.Ambedkar Konaseema', ambedkarkonaseema:'Dr.B.R.Ambedkar Konaseema',
+  srisathyasai:'Sri Satya sai', sathyasai:'Sri Satya sai', satyasai:'Sri Satya sai',
+  parvathipuram:'Parvatipuram', parvathipurammanyam:'Parvatipuram',
+  parvatipurammanyam:'Parvatipuram', manyam:'Parvatipuram',
+  vizag:'Visakhapatnam', vishakhapatnam:'Visakhapatnam',
+  vijayawada:'NTR', krishnantr:'NTR',
+  asr:'Alluri Sitharama Raju', allurisitaramaraju:'Alluri Sitharama Raju',
+  ananthapuramu:'Anantapur', anantapuramu:'Anantapur', ananthapur:'Anantapur',
+  // Telangana
+  rangareddi:'RangaReddy', kvrangareddy:'RangaReddy', kvrangareddi:'RangaReddy',
+  medchal:'Medchal\u2013Malkajgiri', malkajgiri:'Medchal\u2013Malkajgiri',
+  komarambheemasifabad:'Kumarambheem Asifabad', kumurambheemasifabad:'Kumarambheem Asifabad',
+  kumrambheemasifabad:'Kumarambheem Asifabad', asifabad:'Kumarambheem Asifabad',
+  komarambheem:'Kumarambheem Asifabad',
+  warangal:'Warangal Urban', hanumakonda:'Warangal Urban', hanamkonda:'Warangal Urban',
+  jayashankar:'Jayashankar Bhupalapally', bhupalapally:'Jayashankar Bhupalapally',
+  bhadradri:'Bhadradri Kothagudem', kothagudem:'Bhadradri Kothagudem',
+  jogulamba:'Jogulamba Gadwal', gadwal:'Jogulamba Gadwal',
+  yadadri:'Yadadri Bhuvanagiri', bhuvanagiri:'Yadadri Bhuvanagiri', bhongir:'Yadadri Bhuvanagiri',
+  rajanna:'Rajanna Sircilla', sircilla:'Rajanna Sircilla', sirsilla:'Rajanna Sircilla',
+  mahbubnagar:'Mahabubnagar', mahaboobnagar:'Mahabubnagar',
+  mahbubabad:'Mahabubabad', mahaboobabad:'Mahabubabad',
+  secunderabad:'Hyderabad'
+};
+
+const normD = v => String(v == null ? '' : v).toLowerCase()
+  .replace(/\bdistrict\b|\bdist\b/g, '').replace(/[^a-z0-9]/g, '');
+
+const ttdStateKey = st => {
+  const n = normD(st);
+  if (n === 'andhrapradesh' || n === 'ap') return 'Andhra Pradesh';
+  if (n === 'telangana' || n === 'ts' || n === 'tg') return 'Telangana';
+  return null;
+};
+
+// Returns the booking site's own spelling, or '' when we cannot be sure.
+// Only ever guesses within the state we were given.
+function canonDistrict(state, raw){
+  const key = ttdStateKey(state);
+  const want = normD(raw);
+  if (!want) return '';
+  const search = key ? [key] : Object.keys(TTD_DISTRICTS);
+  for (const k of search){
+    const hit = TTD_DISTRICTS[k].find(d => normD(d) === want);
+    if (hit) return hit;
+  }
+  const aliased = TTD_DIST_ALIAS[want];
+  if (aliased && (!key || TTD_DISTRICTS[key].includes(aliased))) return aliased;
+  // last resort, and only inside a known state: a clear prefix of one name
+  if (key){
+    const near = TTD_DISTRICTS[key].filter(d => normD(d).startsWith(want) || want.startsWith(normD(d)));
+    if (near.length === 1) return near[0];
+  }
+  return '';
+}
+
 // ════════════════════════════════════════════
 // PINCODE DISTRICT/STATE VERIFICATION
 // ════════════════════════════════════════════
@@ -6401,7 +6578,10 @@ async function verifyPincode(pin, ctx) {
     }
 
     let corrected=0;
-    for(const [el,value] of [[districtEl,api.district],[stateEl,api.state]]){
+    // India Post says "Y.S.R." and "Ranga Reddy"; the booking site says "YSR"
+    // and "RangaReddy". Store the one the scripts can actually select.
+    const apiDistrict = canonDistrict(api.state, api.district) || api.district;
+    for(const [el,value] of [[districtEl,apiDistrict],[stateEl,api.state]]){
       if(el && value && el.value.trim()!==value){setFieldValue(el,value);flash(el);corrected++;}
     }
     const cityEl=document.getElementById(prefix+'city');
@@ -6409,7 +6589,7 @@ async function verifyPincode(pin, ctx) {
       setFieldValue(cityEl,api.offices[0]);flash(cityEl);corrected++;
     }
     bar.className='pin-verify-bar show ok';
-    msgEl.innerHTML=`✅ Pincode ${escHtml(pin)} verified — ${escHtml(api.district)}, ${escHtml(api.state)}`;
+    msgEl.innerHTML=`✅ Pincode ${escHtml(pin)} verified — ${escHtml(apiDistrict)}, ${escHtml(api.state)}`;
     if(corrected){msgEl.insertAdjacentHTML('beforeend','<small>Address corrected from the pincode</small>');if(ctx==='reg') markDirty();}
     if(api.offices?.length>1) msgEl.insertAdjacentHTML('beforeend',`<small>${api.offices.length} localities share this pincode — choose the correct City. Street and door number stay as entered.</small>`);
   } catch(e) {
@@ -10190,7 +10370,11 @@ function refilterGeoLists(state){
       .map(v => `<option value="${escAttr(v)}"></option>`).join('');
   };
   const pick = bag => st ? (bag[st] || []) : Object.values(bag).flat();
-  fill('district', mergeLists(pick(GEO.districts)));
+  // Inside the two states the scripts book in, offer exactly what the booking
+  // site offers — a district it has never heard of cannot be selected there.
+  const ttdKey = ttdStateKey(st);
+  fill('district', ttdKey ? TTD_DISTRICTS[ttdKey].slice().sort((a,b) => a.localeCompare(b))
+                          : mergeLists(pick(GEO.districts)));
   fill('city',     mergeLists(_pinOffices, pick(GEO.cities)));
   fill('street',   mergeLists(_pinOffices,
         allRecords.map(r => String(r.street||'').trim())));
@@ -10230,6 +10414,26 @@ function rebuildDatalists() {
   geoLearnFromRecords();
   populateStateSelects();
   refilterGeoLists('');
+  wireDistrictSnap();
+}
+
+// A district typed or pasted by hand gets the booking site's spelling when it
+// is recognisably one of theirs. Anything unrecognised is left exactly alone.
+function snapDistrict(inputId, stateId){
+  const el = document.getElementById(inputId);
+  const st = document.getElementById(stateId)?.value || '';
+  if (!el || !el.value.trim()) return;
+  const canon = canonDistrict(st, el.value);
+  if (canon && canon !== el.value.trim()){ setFieldValue(el, canon); flash(el); }
+}
+function wireDistrictSnap(){
+  [['r-district','r-state'], ['f-district','f-state'], ['fast-district','fast-state']]
+    .forEach(([d, st]) => {
+      const el = document.getElementById(d);
+      if (!el || el._snap) return;
+      el._snap = 1;
+      el.addEventListener('blur', () => snapDistrict(d, st));
+    });
 }
 
 // ── typing cleanups ─────────────────────────────────────────────
