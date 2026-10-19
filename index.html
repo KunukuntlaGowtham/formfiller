@@ -2037,7 +2037,9 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
   <label for="cfg-table">Table</label>
   <input class="cfg-input" id="cfg-table" value="customers" placeholder="table name" />
   <label for="cfg-gemini">Gemini Key</label>
-  <input class="cfg-input" id="cfg-gemini" type="password" placeholder="AIza… (for OCR)" />
+  <input class="cfg-input" id="cfg-gemini" type="password" placeholder="AIza… (for OCR)"
+         autocomplete="off" spellcheck="false" oninput="geminiKeyCheck()" onchange="geminiKeyCheck()" />
+  <span id="cfg-gemini-note" style="font-size:11px;"></span>
   <label for="cfg-openrouter">OpenRouter Key</label>
   <input class="cfg-input" id="cfg-openrouter" type="password" placeholder="sk-or-… (free vision)" autocomplete="off" />
   <button id="btn-connect">⚡ Connect</button>
@@ -5213,6 +5215,57 @@ document.addEventListener('input', e => {
   if (e.target.closest('#pg-register, #pg-fast')) markDirty();
 }, true);
 
+
+// ── talking to Gemini ─────────────────────────────────────────────────────
+// The key goes in a header, never in the URL. Interpolated into a query
+// string, a key with a stray "&" in it — or a blob of HTML pasted into the
+// wrong box in Config — gets parsed by Google as query parameters, and the
+// reply is a screenful of "Unknown name" for every fragment of it.
+const GEMINI_URL = m => `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
+const geminiHeaders = key => ({ 'Content-Type':'application/json', 'x-goog-api-key': key });
+
+// Google's keys are AIza followed by 35 url-safe characters. Checking the
+// shape here turns a thousand lines of API error into one sentence.
+function geminiKeyProblem(raw){
+  const k = String(raw || '').trim();
+  if (!k) return 'Enter your Gemini API key in Config (⚙).';
+  if (k.length > 80 || /[\s<>"'&]/.test(k))
+    return 'The Gemini Key box in Config does not hold an API key — something else was pasted into it. Clear it and paste the key, which starts with AIza.';
+  if (!/^AIza[\w-]{20,}$/.test(k))
+    return 'That does not look like a Gemini API key. They start with AIza. Check the Gemini Key box in Config.';
+  return '';
+}
+
+// Say it in the config bar the moment it is pasted, rather than at the end of
+// a scan that was never going to work.
+function geminiKeyCheck(){
+  const el = document.getElementById('cfg-gemini');
+  const note = document.getElementById('cfg-gemini-note');
+  if (!el || !note) return;
+  const raw = el.value;
+  // A paste that is plainly not a key is trimmed of nothing and simply flagged;
+  // clearing someone's box for them would be worse than saying what is wrong.
+  const bad = raw.trim() ? geminiKeyProblem(raw) : '';
+  note.textContent = !raw.trim() ? '' : bad ? '⚠ not a key' : '✓ key looks right';
+  note.style.color = bad ? 'var(--red)' : 'var(--green)';
+  note.title = bad || '';
+  el.style.borderColor = bad ? 'var(--red)' : '';
+}
+
+// Reads the key, or throws something a person can act on.
+function geminiKey(){
+  const k = (document.getElementById('cfg-gemini')?.value || '').trim();
+  const bad = geminiKeyProblem(k);
+  if (bad) throw new Error(bad);
+  return k;
+}
+
+// API errors can run to thousands of characters. Keep the first sentence.
+function briefErr(e){
+  const m = String((e && e.message) || e || 'Something went wrong');
+  return m.length > 300 ? m.slice(0, 300).replace(/\s+\S*$/, '') + '…' : m;
+}
+
 // ════════════════════════════════════════════
 // AI IMAGE EDITOR (OCR)
 // ════════════════════════════════════════════
@@ -5283,8 +5336,8 @@ async function geminiVision(gemKey, pngDataUrl, promptText, maxTokens=2048){
                   data:pngDataUrl.split(',')[1]}},
     {text:promptText}
   ]}],generationConfig:{temperature:0.05,maxOutputTokens:maxTokens}};
-  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gemKey}`,
-    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const res=await fetch(GEMINI_URL('gemini-2.5-flash'),
+    {method:'POST',headers:geminiHeaders(gemKey),body:JSON.stringify(payload)});
   if(!res.ok){let m='Gemini error '+res.status;try{const e=await res.json();m=e.error?.message||m;}catch(_){}throw new Error(m);}
   const data=await res.json();
   const text=(data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('').trim();
@@ -5371,6 +5424,12 @@ async function runOcr(){
   const label=useFree?'OpenRouter Free Vision':'Gemini';
   const apiKey=document.getElementById(useFree?'cfg-openrouter':'cfg-gemini').value.trim();
   if(!apiKey){toast('ENTER '+(useFree?'OPENROUTER':'GEMINI')+' API KEY IN CONFIG','err');return;}
+  if(!useFree){
+    const bad=geminiKeyProblem(apiKey);
+    if(bad){ const sb=document.getElementById('ocr-status');
+      sb.style.display='flex'; sb.className='ai-status fail'; sb.textContent='❌ '+bad;
+      toast('CHECK THE GEMINI KEY','err'); return; }
+  }
   if(!aiEd){toast('UPLOAD A FORM IMAGE FIRST','err');return;}
   const sEl=document.getElementById('ocr-status');
   sEl.style.display='flex'; sEl.className='ai-status proc';
@@ -5391,8 +5450,8 @@ async function runOcr(){
     autoEmail();
     aiProgressEnd(task,`AI FILLED ${filled} FIELDS`,'✅');
   }catch(e){
-    sEl.className='ai-status fail';sEl.textContent='❌ '+e.message;
-    toast('OCR ERROR: '+e.message,'err');aiProgressEnd(task,'OCR ERROR','❌');
+    sEl.className='ai-status fail';sEl.textContent='❌ '+briefErr(e);
+    toast('OCR ERROR: '+briefErr(e),'err');aiProgressEnd(task,'OCR ERROR','❌');
   }finally{
     document.getElementById('btn-ocr').disabled=false;
     document.getElementById('ocr-provider').disabled=false;
@@ -5464,8 +5523,8 @@ async function geminiMulti(gemKey, images, promptText, maxTokens = 4096, model =
   };
   for (let attempt = 0; attempt < 2; attempt++){
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${gemKey}`,
-      { method:'POST', headers:{'Content-Type':'application/json'}, body: body() });
+      GEMINI_URL(model),
+      { method:'POST', headers: geminiHeaders(gemKey), body: body() });
     if (!res.ok){
       let m = 'Gemini error ' + res.status;
       try { const e = await res.json(); m = e.error?.message || m; } catch(_){}
@@ -5846,8 +5905,9 @@ async function bxScanAll(){
   if (bxRunning) return;
   const queue = bxCards.filter(c => c.images.length && c.status !== 'busy' && c.status !== 'saved');
   if (!queue.length){ bxMsg('drop some images into a card first', 'warn'); return; }
-  const key = document.getElementById('cfg-gemini').value.trim();
-  if (!key){ toast('ENTER GEMINI API KEY IN CONFIG','err'); bxMsg('no Gemini key in Config','err'); return; }
+  let key;
+  try { key = geminiKey(); }
+  catch(e){ toast('CHECK THE GEMINI KEY','err'); bxMsg(e.message, 'err'); return; }
 
   bxRunning = true;
   document.getElementById('bx-scan').disabled = true;
@@ -5905,8 +5965,11 @@ function bxShaky(fields, conf){
 async function bxScanOne(id, keyIn){
   const c = bxCard(id);
   if (!c || !c.images.length) return false;
-  const key = keyIn || document.getElementById('cfg-gemini').value.trim();
-  if (!key){ toast('ENTER GEMINI API KEY IN CONFIG','err'); return false; }
+  let key = keyIn;
+  if (!key){
+    try { key = geminiKey(); }
+    catch(e){ toast('CHECK THE GEMINI KEY','err'); bxMsg(e.message, 'err'); return false; }
+  }
 
   c.status = 'busy'; c.error = ''; c.model = '';
   bxPaint(c);                       // shows "reading this card…" in place of the form
@@ -5972,7 +6035,7 @@ async function bxScanOne(id, keyIn){
     bxPaint(c); bxStrip();
     return true;
   } catch(e){
-    c.status = 'err'; c.error = e.message || 'Scan failed';
+    c.status = 'err'; c.error = briefErr(e);
     bxPaint(c); bxStrip();
     return false;
   }
@@ -6382,6 +6445,7 @@ document.getElementById('lightbox').onclick=closeLightbox;
 // ════════════════════════════════════════════
 async function runAddressFill(){
   const gemKey=document.getElementById('cfg-gemini').value.trim();
+  { const bad=geminiKeyProblem(gemKey); if(bad){ toast(bad,'err'); return; } }
   if(!gemKey){toast('ENTER GEMINI API KEY IN CONFIG','err');return;}
   const get=id=>document.getElementById(id).value.trim();
   const state=get('r-state'), district=get('r-district'), city=get('r-city'), pincode=get('r-pincode');
@@ -6395,7 +6459,7 @@ Fix spelling and fill missing address fields consistently. Return ONLY JSON:
 {"state":null,"district":null,"city":null,"pincode":null}
 Current: state="${state}", district="${district}", city="${city}", pincode="${pincode}"`}]}],generationConfig:{temperature:0.1,maxOutputTokens:300}};
   try{
-    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${gemKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const res=await fetch(GEMINI_URL('gemini-2.5-flash'),{method:'POST',headers:geminiHeaders(gemKey),body:JSON.stringify(payload)});
     if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Gemini error '+res.status);}
     const data=await res.json();
     const txt=(data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('');
@@ -6785,7 +6849,7 @@ function _aiRender(){
 // ════════════════════════════════════════════
 async function detectAndCropPerson() {
   const gemKey = document.getElementById('cfg-gemini').value.trim();
-  if (!gemKey) { toast('ENTER GEMINI API KEY IN CONFIG', 'err'); return; }
+  { const bad = geminiKeyProblem(gemKey); if (bad) { toast(bad, 'err'); return; } }
   if (!docEd) { toast('LOAD A DOCUMENT FIRST', 'err'); return; }
   const st = document.getElementById('crop-person-status');
   st.innerHTML = '<span style="color:#FFE500">⏳ DETECTING…</span>';
@@ -6834,7 +6898,7 @@ NO markdown, NO explanation.`, 200);
     toast('PERSON PHOTO MOVED TO PHOTO SLOT', 'ok');
     document.getElementById('ph-editor').scrollIntoView({ behavior:'smooth', block:'center' });
   } catch(e) {
-    st.innerHTML = `<span style="color:#E63030">❌ ${escHtml(e.message)}</span>`;
+    st.innerHTML = `<span style="color:#E63030">❌ ${escHtml(briefErr(e))}</span>`;
     aiProgressEnd(task, 'ERROR DETECTING PHOTO', '❌');
     toast('DETECT ERROR: ' + e.message, 'err');
   }
