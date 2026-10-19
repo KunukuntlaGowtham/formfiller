@@ -2694,6 +2694,7 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
         <span class="ico" aria-hidden="true">⌕</span>
         <input type="text" id="ttd-search" placeholder="Search code, name, mobile…" aria-label="Search bookings" />
       </div>
+      <button class="nb nb-ghost" onclick="covOpen()">◫ COVERAGE</button>
       <button class="nb nb-green" onclick="ttdNew()">✚ NEW BOOKING</button>
       <button class="nb nb-blue" onclick="ttdLoad()">↻ REFRESH</button>
     </div>
@@ -2703,6 +2704,17 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
 </div>
 
 <!-- TTD BOOKING EDITOR -->
+<div class="overlay" id="cov-overlay">
+  <div class="modal" style="max-width:860px;" role="dialog" aria-modal="true" aria-label="Booking coverage">
+    <button class="btn-x" onclick="covClose()" title="Close" aria-label="Close">✕</button>
+    <div class="modal-title">BOOKING <span class="hi">COVERAGE</span></div>
+    <p class="bx-note" style="margin:-6px 0 14px;">
+      Who is in the registry but on no booking yet. People are matched by Aadhaar first,
+      then by name, across the lead and everyone travelling with them.</p>
+    <div id="cov-body"></div>
+  </div>
+</div>
+
 <div class="overlay" id="bxph-overlay">
   <div class="modal" style="max-width:760px;" role="dialog" aria-modal="true" aria-label="Choose the photo">
     <button class="btn-x" onclick="bxPhotoClose()" title="Close" aria-label="Close">✕</button>
@@ -5806,9 +5818,10 @@ async function bxPinFix(cardId, pin){
     stEl.classList.add('ai-fill'); setTimeout(() => stEl.classList.remove('ai-fill'), 4000);
   }
   if (dEl){
+    const had = dEl.value;                       // read it before the options are replaced
     dEl.innerHTML = bxDistrictOptions(api.state || stEl?.value, want);
     if (dEl.value !== want) setFieldValue(dEl, want);
-    if (normD(want) !== normD(c.fields.district || '')) changed.push('district');
+    if (had !== want) changed.push('district');
     dEl.classList.add('ai-fill'); setTimeout(() => dEl.classList.remove('ai-fill'), 4000);
   }
   const where = [want, api.state].filter(Boolean).join(', ');
@@ -9542,14 +9555,59 @@ function ttdRenderLead(v){
       <div class="fld"><label for="ttd-gothram">Gothram</label>
         <input id="ttd-gothram" value="${escAttr(v.gothram||'')}" /></div>
       <div class="fld"><label for="ttd-city">City</label>
-        <input id="ttd-city" value="${escAttr(v.city||'')}" /></div>
+        <input id="ttd-city" value="${escAttr(v.city||'')}" list="dl-city" /></div>
       <div class="fld"><label for="ttd-state">State</label>
-        <input id="ttd-state" value="${escAttr(v.state||'')}" /></div>
+        <select id="ttd-state" onchange="ttdStateChanged()">${bxStateOptions(v.state||'')}</select></div>
+      <div class="fld"><label for="ttd-district">District</label>
+        <select id="ttd-district">${bxDistrictOptions(v.state||'', v.district||'')}</select></div>
       <div class="fld"><label for="ttd-pincode">Pincode</label>
-        <input id="ttd-pincode" value="${escAttr(v.pincode||'')}" inputmode="numeric" maxlength="6" /></div>
+        <input id="ttd-pincode" value="${escAttr(v.pincode||'')}" inputmode="numeric" maxlength="6"
+               oninput="ttdPinInput()" />
+        <div id="ttd-pin-note" style="font-size:11px;color:var(--muted);margin-top:3px;"></div></div>
       <div class="fld"><label for="ttd-country">Country</label>
         <input id="ttd-country" value="${escAttr(v.country||'India')}" /></div>
     </div>`;
+}
+
+// The district list follows the state, exactly as it does on the booking site.
+function ttdStateChanged(){
+  const st = document.getElementById('ttd-state')?.value || '';
+  const d  = document.getElementById('ttd-district');
+  if (d) d.innerHTML = bxDistrictOptions(st, d.value);
+}
+
+let _ttdPinTimer = null;
+function ttdPinInput(){
+  clearTimeout(_ttdPinTimer);
+  const pin = (document.getElementById('ttd-pincode')?.value || '').trim();
+  const note = document.getElementById('ttd-pin-note');
+  if (!/^\d{6}$/.test(pin)){ if (note) note.textContent = ''; return; }
+  _ttdPinTimer = setTimeout(() => ttdPinFix(pin), 500);
+}
+
+async function ttdPinFix(pin){
+  const note = document.getElementById('ttd-pin-note');
+  const set = (t, col) => { if (note){ note.textContent = t; note.style.color = col; } };
+  set('⏳ checking…', 'var(--muted)');
+  let api = null;
+  try { api = await lookupPincode(pin); }
+  catch(_){ set('could not check the pincode', 'var(--orange)'); return; }
+  if ((document.getElementById('ttd-pincode')?.value || '').trim() !== pin) return;
+  if (!api){ set('⚠ no such pincode', 'var(--red)'); return; }
+
+  const stEl = document.getElementById('ttd-state'), dEl = document.getElementById('ttd-district');
+  const want = canonDistrict(api.state, api.district) || api.district;
+  const changed = [];
+  if (stEl && api.state && stEl.value !== api.state){ setFieldValue(stEl, api.state); changed.push('state'); }
+  if (dEl){
+    const had = dEl.value;                       // read it before the options are replaced
+    dEl.innerHTML = bxDistrictOptions(api.state || stEl?.value, want);
+    if (dEl.value !== want) setFieldValue(dEl, want);
+    if (had !== want) changed.push('district');
+  }
+  set(`✓ ${[want, api.state].filter(Boolean).join(', ')}` +
+      (changed.length ? ` — corrected ${changed.join(' and ')}` : ''),
+      changed.length ? 'var(--green)' : 'var(--muted)');
 }
 
 function ttdRenderParty(){
@@ -9637,7 +9695,8 @@ function ttdOpen(id){
   ttdRenderLead({
     name: r.sevakname, age: r.age, gender: r.gender, idType: r.idtype, idNumber: r.idnumber,
     mobile: r.mobile, email: r.email, gothram: r.gothram,
-    city: r.city, state: r.state, pincode: r.pincode, country: r.country || 'India'
+    city: r.city, state: r.state, district: r.district,
+    pincode: r.pincode, country: r.country || 'India'
   });
   ttdRenderParty();
   ttdMsg('');
@@ -9691,8 +9750,11 @@ function ttdPullFromRegistry(){
     idType: 'Aadhaar Card',
     idNumber: rec.idNumber || '',
     mobile: rec.mobileNo || '', email: rec.email || '', gothram: '',
-    city: rec.city || '', state: rec.state || '', pincode: rec.pincode || '', country: 'India'
+    city: rec.city || '', state: rec.state || '',
+    district: canonDistrict(rec.state, rec.district) || rec.district || '',
+    pincode: rec.pincode || '', country: 'India'
   });
+  ttdPinInput();
   ttdRenderParty();
   ttdMsg('Filled from the registry — check it before saving.', 'ok');
 }
@@ -9726,6 +9788,7 @@ function ttdCollect(){
     gothram:   g('ttd-gothram'),
     city:      g('ttd-city'),
     state:     g('ttd-state'),
+    district:  g('ttd-district'),
     pincode:   g('ttd-pincode'),
     country:   g('ttd-country') || 'India'
   };
@@ -9798,6 +9861,172 @@ async function ttdDelete(){
     ttdClose();
     toast('BOOKING DELETED', 'ok');
   } catch(e){ ttdMsg(e.message, 'err'); }
+}
+
+
+// ════════════════════════════════════════════
+// BOOKING COVERAGE  (registry ↔ ttd_db)
+// ════════════════════════════════════════════
+// Bookings are typed in separately from the registry, so a team can be fully
+// registered and still half unbooked with nothing saying so. A ttd_db row is
+// one booking of up to eight people, not one person, so this counts people
+// across the lead and the party rather than comparing row counts.
+
+// Aadhaar is the reliable key; a name is the fallback when there is none.
+function covKey(aadhaar, name){
+  const a = normalizeAadhaar(aadhaar || '').replace(/\D/g, '');
+  if (a.length >= 8) return 'a:' + a;
+  const n = nameKey(name || '');
+  return n ? 'n:' + n : '';
+}
+
+// Everyone already on a booking, by team.
+function covBooked(){
+  const map = {};                       // group -> Set(key)
+  (ttdRows || []).forEach(r => {
+    const g = codeGroup(r.code).toUpperCase();
+    (map[g] = map[g] || new Set());
+    const add = (aad, nm) => { const k = covKey(aad, nm); if (k) map[g].add(k); };
+    add(r.idnumber, r.sevakname);
+    for (let n = 2; n <= TTD_MAX_PARTY; n++) add(r['p'+n+'_idnumber'], r['p'+n+'_name']);
+  });
+  return map;
+}
+
+function covReport(){
+  const booked = covBooked();
+  const teams = {};
+  (allRecords || []).forEach(r => {
+    const g = codeGroup(r.code).toUpperCase();
+    if (!g || g === String(NO_CODE).toUpperCase()) return;
+    (teams[g] = teams[g] || { group: g, people: [], missing: [] }).people.push(r);
+  });
+  Object.values(teams).forEach(t => {
+    const have = booked[t.group] || new Set();
+    t.missing = t.people.filter(r =>
+      !have.has(covKey(r.idNumber, [r.sevakName, r.surName].filter(Boolean).join(' '))));
+    t.bookedCount = t.people.length - t.missing.length;
+    t.rows = (ttdRows || []).filter(x => codeGroup(x.code).toUpperCase() === t.group).length;
+  });
+  // bookings whose team has nobody in the registry at all
+  const orphan = (ttdRows || []).filter(x => {
+    const g = codeGroup(x.code).toUpperCase();
+    return !teams[g];
+  });
+  return { teams: Object.values(teams).sort((a,b) =>
+    (b.missing.length - a.missing.length) || a.group.localeCompare(b.group, undefined, {numeric:true})),
+    orphan };
+}
+
+function covOpen(){
+  if (!ttdLoaded){ toast('LOADING BOOKINGS FIRST','ok'); ttdLoad().then(covOpen); return; }
+  openOverlay('cov-overlay');
+  covRender();
+}
+function covClose(){ closeOverlay('cov-overlay'); }
+
+function covRender(){
+  const box = document.getElementById('cov-body');
+  const { teams, orphan } = covReport();
+  if (!teams.length && !orphan.length){
+    box.innerHTML = '<div class="chk-empty"><div class="big">NOTHING TO COMPARE</div>' +
+      '<p>Register some people and add some bookings first.</p></div>';
+    return;
+  }
+  const short = (n, list) => list.slice(0, n).map(r =>
+      escHtml([r.sevakName, r.surName].filter(Boolean).join(' ') || r.idNumber || '—')).join(', ')
+    + (list.length > n ? ` +${list.length - n} more` : '');
+
+  box.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;">
+      <div class="stat c1"><div class="v">${teams.length}</div><div class="l">TEAMS</div></div>
+      <div class="stat c2"><div class="v">${teams.reduce((a,t)=>a+t.bookedCount,0)}</div><div class="l">ON A BOOKING</div></div>
+      <div class="stat c3"><div class="v">${teams.reduce((a,t)=>a+t.missing.length,0)}</div><div class="l">NOT YET</div></div>
+      <div class="stat c4"><div class="v">${orphan.length}</div><div class="l">UNKNOWN TEAM</div></div>
+    </div>
+    <div style="max-height:46vh;overflow:auto;">
+    ${teams.map(t => `
+      <div style="display:flex;gap:12px;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line);flex-wrap:wrap;">
+        <strong style="min-width:70px;font-family:'Space Mono',monospace;">${escHtml(t.group)}</strong>
+        <span class="bx-note" style="min-width:150px;">
+          ${t.bookedCount} of ${t.people.length} booked · ${t.rows} booking${t.rows===1?'':'s'}</span>
+        <span class="bx-note" style="flex:1;min-width:180px;color:${t.missing.length?'var(--orange)':'var(--green)'};">
+          ${t.missing.length ? '◆ ' + short(3, t.missing) : '✓ everyone is on a booking'}</span>
+        ${t.missing.length ? `<button class="nb nb-green nb-sm" onclick="covFill('${escAttr(t.group)}')">
+          ✚ BOOK ${t.missing.length}</button>` : ''}
+      </div>`).join('')}
+    ${orphan.length ? `<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--line);">
+      <div class="bx-note" style="color:var(--muted);">Bookings whose team is not in the registry:
+      <strong>${orphan.map(o => escHtml(o.code || '—')).join(', ')}</strong></div></div>` : ''}
+    </div>`;
+}
+
+// Name a generated booking after its lead's own registry code, so pulling it
+// back from the registry later finds the right person. Falls back to the next
+// free code in the team, because ttd_db.code is unique.
+function covNextCode(group, leadCode){
+  const used = new Set((ttdRows || []).map(r => String(r.code || '').trim().toUpperCase()));
+  const own = String(leadCode || '').trim();
+  if (own && !used.has(own.toUpperCase())) return own;
+  for (let n = 1; n < 1000; n++){
+    const c = group + n;
+    if (!used.has(c.toUpperCase())) return c;
+  }
+  return group + Date.now();
+}
+
+// Pack the people with no booking into rows of eight — a lead plus seven —
+// filled from their registry records, and save them.
+async function covFill(group){
+  const t = covReport().teams.find(x => x.group === group);
+  if (!t || !t.missing.length) return;
+  const n = t.missing.length;
+  const rowCount = Math.ceil(n / TTD_MAX_PARTY);
+  if (!confirm(`Create ${rowCount} booking${rowCount===1?'':'s'} covering ${n} ` +
+               `${n===1?'person':'people'} in ${group}?\n\n` +
+               `Check each one before the scripts use it — nothing is booked by this.`)) return;
+
+  const asPerson = r => ({
+    name: [r.sevakName, r.surName].filter(Boolean).join(' '),
+    age: (typeof ageFromDob === 'function' ? ageFromDob(r.dob) : '') || '',
+    gender: normGender(r.gender) || '',
+    idType: 'Aadhaar Card',
+    idNumber: normalizeAadhaar(r.idNumber || '')
+  });
+
+  const made = [];
+  try {
+    for (let i = 0; i < n; i += TTD_MAX_PARTY){
+      const chunk = t.missing.slice(i, i + TTD_MAX_PARTY);
+      const lead = chunk[0], L = asPerson(lead);
+      const row = {
+        code: covNextCode(group, lead.code),
+        sevakname: L.name, age: L.age, gender: L.gender,
+        idtype: L.idType, idnumber: L.idNumber,
+        mobile: lead.mobileNo || '', email: lead.email || '', gothram: '',
+        city: lead.city || '', state: lead.state || '',
+        district: canonDistrict(lead.state, lead.district) || lead.district || '',
+        pincode: lead.pincode || '', country: 'India'
+      };
+      for (let k = 2; k <= TTD_MAX_PARTY; k++){
+        const v = chunk[k-1] ? asPerson(chunk[k-1]) : {};
+        row['p'+k+'_name']     = v.name || '';
+        row['p'+k+'_age']      = v.age || '';
+        row['p'+k+'_gender']   = v.gender || '';
+        row['p'+k+'_idtype']   = v.name ? (v.idType || 'Aadhaar Card') : '';
+        row['p'+k+'_idnumber'] = v.idNumber || '';
+      }
+      const saved = await insertWithSchemaRetry(row, TTD_TABLE);
+      if (Array.isArray(saved) && saved[0]) ttdRows.push(saved[0]);
+      made.push(row.code);
+    }
+    ttdRows.sort((a,b) => String(a.code||'').localeCompare(String(b.code||''), undefined, {numeric:true}));
+    ttdRender(); ctlFillCodes(); covRender();
+    toast(`CREATED ${made.join(', ')}`, 'ok');
+  } catch(e){
+    toast('COULD NOT CREATE: ' + briefErr(e), 'err');
+    if (made.length) covRender();
+  }
 }
 
 // ════════════════════════════════════════════

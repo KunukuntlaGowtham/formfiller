@@ -40,6 +40,10 @@ alter table public.ttd_db add column if not exists gothram  text;
 alter table public.ttd_db add column if not exists city     text;
 alter table public.ttd_db add column if not exists state    text;
 alter table public.ttd_db add column if not exists country  text;
+
+-- The booking site asks for a district, and until now there was nowhere to put
+-- one, so the scripts had nothing to fill that dropdown from. Safe to re-run.
+alter table public.ttd_db add column if not exists district text;
 alter table public.ttd_db add column if not exists pincode  text;
 
 -- Everyone else on the same booking: p2 … p8, i.e. up to eight people in all.
