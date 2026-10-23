@@ -110,3 +110,21 @@ notify pgrst, 'reload schema';
 -- delete from public.ttd_commands where created_at < now() - interval '1 day';
 -- delete from public.ttd_devices  where seen_at    < now() - interval '7 days';
 -- ═══════════════════════════════════════════════════════════════════════════
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 4. WHICH COMMAND A LAPTOP LAST CARRIED OUT   (added for 74.3)
+--
+--    The control room's 🧪 TEST used to watch seen_at move, but the heartbeat
+--    moves that every few seconds on its own — so a laptop that was ignoring
+--    every command still passed the test. The script now reports the id of the
+--    last command it actually acted on, and TEST waits for the ping it just
+--    sent to come back by number. Without these two columns the test falls
+--    back to "alive, but unconfirmed", which is why the script sends them
+--    hopefully and drops them if Postgres says no.
+-- ───────────────────────────────────────────────────────────────────────────
+
+alter table public.ttd_devices add column if not exists ack_id bigint;
+alter table public.ttd_devices add column if not exists ack_at timestamptz;
+
+notify pgrst, 'reload schema';

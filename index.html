@@ -2754,6 +2754,18 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
       <button class="nb nb-blue" onclick="ctlRefresh()">↻ REFRESH</button>
     </div>
   </div>
+  <!-- The one thing that makes a laptop deaf to everything on this page, in
+       the one place you look when nothing answers. -->
+  <div style="margin:0 16px 12px;padding:9px 12px;border-radius:8px;background:var(--panel-2,rgba(148,163,184,.08));
+              border:1px solid var(--line);font-family:'Space Mono',monospace;font-size:11.5px;
+              color:var(--muted-2);line-height:1.6;">
+    <strong style="color:var(--text);">Nothing answering?</strong>
+    A laptop only hears this page while its own panel reads
+    <strong style="color:var(--text);">“control room · <span id="ctl-roomecho">default</span>”</strong>
+    next to the clock. On script <strong>74.3</strong> and up that happens by itself; on an older one, tap
+    that label until it says <strong>all devices</strong> and set the room to match.
+    A laptop whose clock is minutes out also ignored every command before 74.3.
+  </div>
   <div class="stats-strip" id="ctl-strip" style="display:none;"></div>
 
   <div style="padding:0 16px 24px;">
@@ -9446,6 +9458,11 @@ const ctlLive = d => ctlAge(d) * 1000 < CTL_STALE_MS;
 // A device id is safe in an id attribute, but never assume it.
 const ctlKey  = dev => 'dv-' + String(dev).replace(/[^A-Za-z0-9_-]/g, '');
 
+function ctlRoomEcho(){
+  const el = document.getElementById('ctl-roomecho');
+  if (el) el.textContent = ctlRoom();
+}
+
 function ctlEnter(){
   if (!ctlStarted){
     ctlStarted = true;
@@ -9454,10 +9471,12 @@ function ctlEnter(){
       try { localStorage.setItem('ttdCtlRoom', e.target.value.trim() || 'default'); } catch(_){}
       ctlSel.clear();
       document.getElementById('ctl-rows').innerHTML = '';   // different room, different laptops
+      ctlRoomEcho();
       ctlRefresh();
     });
     document.getElementById('ctl-form').innerHTML = ctlFormHtml();
   }
+  ctlRoomEcho();
   ctlRefresh();
   clearInterval(ctlTimer);
   ctlTimer = setInterval(() => {
@@ -9633,6 +9652,7 @@ function ctlPaintRow(row, d){
   if (t){
     if (t.state === 'waiting'){ state = 'pinging…'; cls = 'idle';  dot = 'var(--blue)'; }
     if (t.state === 'ok')     { state = 'answered ' + (t.ms/1000).toFixed(1) + 's'; cls = 'auto'; dot = 'var(--green)'; }
+    if (t.state === 'weak')   { state = 'alive ' + (t.ms/1000).toFixed(1) + 's'; cls = 'idle'; dot = 'var(--orange)'; }
     if (t.state === 'fail')   { state = 'no answer'; cls = 'bad'; dot = 'var(--red)'; }
   }
   const dev = escAttr(d.device);
@@ -9781,9 +9801,11 @@ function ctlFillCodes(){
 }
 
 // ── sending ───────────────────────────────────────────────────────────────
-async function ctlPost(row){
-  return supa(CTL_CMD, { method:'POST', headers:{'Prefer':'return=minimal'},
-                         body: JSON.stringify(Object.assign({ room: ctlRoom(), issued_by: 'control-room' }, row)) });
+async function ctlPost(row, wantId){
+  const out = await supa(CTL_CMD + (wantId ? '?select=id' : ''),
+    { method:'POST', headers:{'Prefer': wantId ? 'return=representation' : 'return=minimal'},
+      body: JSON.stringify(Object.assign({ room: ctlRoom(), issued_by: 'control-room' }, row)) });
+  return wantId ? (Array.isArray(out) ? out[0] : out) : out;
 }
 
 // One command per selected laptop, addressed to it. Sending a single
@@ -9854,8 +9876,16 @@ async function ctlRename(dev){
    so a laptop that joins a moment later hears it too. */
 async function ctlAll(cmd){
   const n = ctlDevices.filter(ctlLive).length;
+  // Sending to an empty room looks exactly like sending to a room that
+  // ignores you, so say which it is.
+  if (!ctlDevices.length){
+    ctlMsg(`no laptop has joined room "${ctlRoom()}" — see the note under REFRESH`, 'warn');
+    toast('NOBODY IN ROOM ' + ctlRoom().toUpperCase(), 'warn');
+    return;
+  }
   if (cmd === 'stop' || confirm(`${cmd === 'start' ? 'Start' : 'Open on'} every laptop on "${ctlRoom()}"?` +
-      `\n\n${n} online right now.`)){
+      (n ? `\n\n${n} online right now.`
+         : `\n\nNONE of the ${ctlDevices.length} are online right now — nothing may hear this.`))){
     const target = cmd === 'open' ? (document.getElementById('ctl-service')?.value || '') : null;
     if (cmd === 'open' && !target){ ctlMsg('choose a service in the form first', 'warn'); return; }
     try {
@@ -9882,19 +9912,26 @@ async function ctlTest(dev){
   // fresh test rather than appear to do nothing.
   if (ctlTestBusy){ ctlMsg('a test is already running', 'warn'); return; }
   const targets = dev ? ctlDevices.filter(d => d.device === dev) : ctlDevices.slice();
-  if (!targets.length){ ctlMsg('nobody to test', 'warn'); return; }
+  if (!targets.length){
+    ctlMsg(`no laptop has joined room "${ctlRoom()}" — see the note under REFRESH`, 'warn');
+    toast('NOBODY IN ROOM ' + ctlRoom().toUpperCase(), 'warn');
+    return;
+  }
   clearTimeout(ctlTestClear);
   ctlTestBusy = true;
 
   const sentAt = Date.now();
-  const before = new Map(targets.map(d => [d.device, d.seen_at]));
+  // Two things are remembered: what the laptop last said, and which command
+  // it last carried out. The second is the real answer.
+  const before = new Map(targets.map(d => [d.device, { seen: d.seen_at, ack: +d.ack_id || 0 }]));
   ctlTesting = new Map(targets.map(d => [d.device, { state:'waiting' }]));
   ctlRender();
-  ctlMsg('pinging ' + (dev ? 1 : targets.length) + '…', 'ok');
+  ctlMsg('pinging ' + targets.length + '…', 'ok');
 
+  let pingId = 0;
   try {
-    if (dev) await ctlPost({ cmd:'ping', to_device: dev });
-    else     await ctlPost({ cmd:'ping', to_device: null });
+    const r = await ctlPost({ cmd:'ping', to_device: dev || null }, true);
+    pingId = (r && +r.id) || 0;
   } catch(e){
     ctlTestBusy = false; ctlTesting = null;
     ctlMsg(e.message, 'err'); ctlRender(); return;
@@ -9910,24 +9947,35 @@ async function ctlTest(dev){
     ctlDevices = rows;
     let pending = 0;
     rows.forEach(d => {
-      const t = ctlTesting.get(d.device);
-      if (!t || t.state !== 'waiting') return;
-      if (before.has(d.device) && d.seen_at !== before.get(d.device)){
+      const t = ctlTesting.get(d.device), b = before.get(d.device);
+      if (!t || !b || t.state !== 'waiting') return;
+      // Carried out the very command we just sent. Nothing else is proof:
+      // the heartbeat moves seen_at every few seconds on its own, so a
+      // laptop ignoring every command used to pass this test.
+      if (pingId && d.ack_id != null && +d.ack_id >= pingId){
         ctlTesting.set(d.device, { state:'ok', ms: Date.now() - sentAt });
+      } else if (d.ack_id === undefined && d.seen_at !== b.seen){
+        // No ack column in the database yet, so liveness is all there is.
+        ctlTesting.set(d.device, { state:'weak', ms: Date.now() - sentAt });
       } else pending++;
     });
     ctlRender();
     if (!pending) break;
   }
 
-  let ok = 0, bad = 0;
+  let ok = 0, bad = 0, weak = 0;
   ctlTesting.forEach((t, device) => {
-    if (t.state === 'waiting'){ ctlTesting.set(device, { state:'fail' }); bad++; } else ok++;
+    if (t.state === 'waiting'){ ctlTesting.set(device, { state:'fail' }); bad++; }
+    else if (t.state === 'weak') weak++;
+    else ok++;
   });
   ctlTestBusy = false;
   ctlRender();
-  ctlMsg(bad ? `${ok} answered · ${bad} did not` : `all ${ok} answered`, bad ? 'warn' : 'ok');
-  toast(bad ? `${bad} LAPTOP${bad>1?'S':''} DID NOT ANSWER` : `ALL ${ok} ANSWERED`, bad ? 'warn' : 'ok');
+  const said = [ok ? ok + ' answered' : '', weak ? weak + ' alive but unconfirmed' : '',
+                bad ? bad + ' did not answer' : ''].filter(Boolean).join(' · ');
+  ctlMsg(bad ? said + ' — a silent laptop is not in the room: its panel must read “control room · '
+               + ctlRoom() + '”' : said, bad ? 'warn' : 'ok');
+  toast(bad ? `${bad} LAPTOP${bad>1?'S':''} DID NOT ANSWER` : `ALL ${ok + weak} ANSWERED`, bad ? 'warn' : 'ok');
   // Leave the result on screen for a moment, then go back to normal rows.
   clearTimeout(ctlTestClear);
   ctlTestClear = setTimeout(() => { ctlTesting = null; ctlRender(); }, 6000);
