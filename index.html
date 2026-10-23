@@ -2036,6 +2036,7 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
   padding:2px 7px;border-radius:999px;background:var(--line);color:var(--muted);flex-shrink:0;}
 .ctl-state.auto{background:var(--green);color:#052e16;}
 .ctl-state.idle{background:rgba(59,130,246,.18);color:var(--blue);}
+.ctl-state.bad{background:var(--red);color:#fff;}
 .ctl-set{flex:1;min-width:150px;font-size:11.5px;color:var(--fg);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ctl-page{font-size:11px;color:var(--muted);min-width:78px;}
@@ -2773,9 +2774,16 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
       </label>
       <button class="nb nb-ghost nb-sm" onclick="ctlPickAll('online')">ONLINE ONLY</button>
       <button class="nb nb-ghost nb-sm" onclick="ctlPickAll('none')">CLEAR</button>
-      <span style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+      <span style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         <button class="nb nb-ghost nb-sm" onclick="ctlOpenAll(true)" title="Open every laptop's own panel">⤢ SET UP ALL</button>
         <button class="nb nb-ghost nb-sm" onclick="ctlOpenAll(false)">⤡ CLOSE ALL</button>
+        <span style="width:1px;height:20px;background:var(--line);"></span>
+        <button class="nb nb-blue nb-sm"  onclick="ctlTest()" id="ctl-testall"
+                title="Ping every laptop and see which ones answer">🧪 TEST ALL</button>
+        <button class="nb nb-green nb-sm" onclick="ctlAll('start')"
+                title="Start every laptop on this room — no ticking needed">▶ START ALL</button>
+        <button class="nb nb-red nb-sm"   onclick="ctlAll('stop')"
+                title="Stop every laptop on this room, at once">■ STOP ALL</button>
       </span>
     </div>
     <div id="ctl-rows"></div>
@@ -9618,8 +9626,15 @@ function ctlPaintRow(row, d){
                   : (age > 3600 ? Math.round(age/3600)+'h' : Math.round(age/60)+'m');
   const bits = [d.team, d.picked, d.service, d.tickets == null ? null : d.tickets + ' tkt',
                 d.dates, d.fire_at].filter(Boolean);
-  const dot = !on ? 'var(--muted)' : d.running ? 'var(--green)' : 'var(--blue)';
-  const state = !on ? 'offline' : d.running ? 'AUTO' : 'idle';
+  let dot = !on ? 'var(--muted)' : d.running ? 'var(--green)' : 'var(--blue)';
+  let state = !on ? 'offline' : d.running ? 'AUTO' : 'idle';
+  let cls   = on ? (d.running ? 'auto' : 'idle') : 'off';
+  const t = ctlTesting && ctlTesting.get(d.device);
+  if (t){
+    if (t.state === 'waiting'){ state = 'pinging…'; cls = 'idle';  dot = 'var(--blue)'; }
+    if (t.state === 'ok')     { state = 'answered ' + (t.ms/1000).toFixed(1) + 's'; cls = 'auto'; dot = 'var(--green)'; }
+    if (t.state === 'fail')   { state = 'no answer'; cls = 'bad'; dot = 'var(--red)'; }
+  }
   const dev = escAttr(d.device);
 
   row.classList.toggle('off', !on);
@@ -9634,7 +9649,7 @@ function ctlPaintRow(row, d){
       <strong>${escHtml(name)}</strong>
       ${d.label ? `<span class="ctl-id">${escHtml(d.device)}</span>` : ''}
     </div>
-    <span class="ctl-state ${on ? (d.running ? 'auto' : 'idle') : 'off'}">${state}</span>
+    <span class="ctl-state ${cls}">${escHtml(state)}</span>
     <div class="ctl-set" title="${escAttr(bits.join(' · ') || 'nothing set')}">${
       bits.length ? escHtml(bits.join(' · ')) : '<span style="color:var(--muted);">nothing set</span>'}</div>
     <span class="ctl-page">${escHtml(d.page || '—')}</span>
@@ -9642,6 +9657,7 @@ function ctlPaintRow(row, d){
     <div class="ctl-acts">
       <button class="mini-btn" title="Start this one" onclick="ctlCmd('start','${dev}')">▶</button>
       <button class="mini-btn" title="Stop this one"  onclick="ctlCmd('stop','${dev}')">■</button>
+      <button class="mini-btn" title="Ping this one and time the answer" onclick="ctlTest('${dev}')">🧪</button>
       <button class="mini-btn" title="Rename"         onclick="ctlRename('${dev}')">🏷</button>
       <button class="nb ${open ? 'nb-purple' : 'nb-ghost'} nb-sm" style="padding:4px 9px;"
               onclick="ctlToggle('${dev}')">${open ? '▾ CLOSE' : '✎ SET UP'}</button>
@@ -9827,6 +9843,94 @@ async function ctlRename(dev){
     ctlMsg('renaming…', 'ok');
     setTimeout(ctlRefresh, 1800);
   } catch(e){ ctlMsg(e.message, 'err'); }
+}
+
+
+/* ── whole room, no ticking ───────────────────────────────────────────────
+   START and STOP above act on what is ticked, which is right for a subset
+   and wrong for "stop everything now" — needing to tick four boxes first is
+   not what you want when something is going wrong. These go to the room as
+   one unaddressed command, which is exactly what the relay was built for,
+   so a laptop that joins a moment later hears it too. */
+async function ctlAll(cmd){
+  const n = ctlDevices.filter(ctlLive).length;
+  if (cmd === 'stop' || confirm(`${cmd === 'start' ? 'Start' : 'Open on'} every laptop on "${ctlRoom()}"?` +
+      `\n\n${n} online right now.`)){
+    const target = cmd === 'open' ? (document.getElementById('ctl-service')?.value || '') : null;
+    if (cmd === 'open' && !target){ ctlMsg('choose a service in the form first', 'warn'); return; }
+    try {
+      await ctlPost({ cmd: cmd, target: target, to_device: null });
+      ctlMsg({ start:'started', stop:'stopped', open:'opening ' + target }[cmd] + ' → everyone on ' + ctlRoom(), 'ok');
+      toast(cmd.toUpperCase() + ' → EVERYONE', cmd === 'stop' ? 'err' : 'ok');
+      setTimeout(ctlRefresh, 1800);
+    } catch(e){ ctlMsg(e.message, 'err'); }
+  }
+}
+
+/* ── is this thing on? ────────────────────────────────────────────────────
+   A ping the script already answers by reporting in, so what comes back is
+   proof of the whole path: the command reached that laptop, it was awake,
+   and its heartbeat got home. Anything that only checked seen_at would just
+   be reading how recently it last spoke on its own. */
+let ctlTesting = null;        // device -> {state, ms}, drives what the rows show
+let ctlTestBusy = false;     // a run is actually in flight
+let ctlTestClear = null;     // the timer that puts the rows back
+
+async function ctlTest(dev){
+  // Only a run in flight blocks another. The results stay up for a few
+  // seconds afterwards, and pressing 🧪 during that window should start a
+  // fresh test rather than appear to do nothing.
+  if (ctlTestBusy){ ctlMsg('a test is already running', 'warn'); return; }
+  const targets = dev ? ctlDevices.filter(d => d.device === dev) : ctlDevices.slice();
+  if (!targets.length){ ctlMsg('nobody to test', 'warn'); return; }
+  clearTimeout(ctlTestClear);
+  ctlTestBusy = true;
+
+  const sentAt = Date.now();
+  const before = new Map(targets.map(d => [d.device, d.seen_at]));
+  ctlTesting = new Map(targets.map(d => [d.device, { state:'waiting' }]));
+  ctlRender();
+  ctlMsg('pinging ' + (dev ? 1 : targets.length) + '…', 'ok');
+
+  try {
+    if (dev) await ctlPost({ cmd:'ping', to_device: dev });
+    else     await ctlPost({ cmd:'ping', to_device: null });
+  } catch(e){
+    ctlTestBusy = false; ctlTesting = null;
+    ctlMsg(e.message, 'err'); ctlRender(); return;
+  }
+
+  // The script polls the board about once a second, so give it a fair window.
+  const deadline = sentAt + 12000;
+  while (Date.now() < deadline){
+    await new Promise(r => setTimeout(r, 800));
+    let rows;
+    try { rows = await supa(`${CTL_DEV}?room=eq.${encodeURIComponent(ctlRoom())}&order=seen_at.desc`); }
+    catch(_){ continue; }
+    ctlDevices = rows;
+    let pending = 0;
+    rows.forEach(d => {
+      const t = ctlTesting.get(d.device);
+      if (!t || t.state !== 'waiting') return;
+      if (before.has(d.device) && d.seen_at !== before.get(d.device)){
+        ctlTesting.set(d.device, { state:'ok', ms: Date.now() - sentAt });
+      } else pending++;
+    });
+    ctlRender();
+    if (!pending) break;
+  }
+
+  let ok = 0, bad = 0;
+  ctlTesting.forEach((t, device) => {
+    if (t.state === 'waiting'){ ctlTesting.set(device, { state:'fail' }); bad++; } else ok++;
+  });
+  ctlTestBusy = false;
+  ctlRender();
+  ctlMsg(bad ? `${ok} answered · ${bad} did not` : `all ${ok} answered`, bad ? 'warn' : 'ok');
+  toast(bad ? `${bad} LAPTOP${bad>1?'S':''} DID NOT ANSWER` : `ALL ${ok} ANSWERED`, bad ? 'warn' : 'ok');
+  // Leave the result on screen for a moment, then go back to normal rows.
+  clearTimeout(ctlTestClear);
+  ctlTestClear = setTimeout(() => { ctlTesting = null; ctlRender(); }, 6000);
 }
 
 // ════════════════════════════════════════════
