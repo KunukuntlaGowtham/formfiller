@@ -6360,22 +6360,16 @@ async function bxScanOne(id, keyIn){
 }
 
 // "crop the given photo; if there isn't one, crop from the document; if there
-// are two, take the best." The model lists every face it finds with a quality
-// score — a standalone portrait is worth more than the same face printed small
-// on an ID, so it gets a thumb on the scale before we take the highest.
+// The model is still asked where the faces are — that rides along with reading
+// the fields and costs no extra call — but it no longer picks one and crops it.
+// Detection points at the photo; the crop is a human decision, made on the card
+// with CHOOSE. An auto-crop that is slightly off is worse than none at all,
+// because a slot that already looks filled is a slot nobody checks.
 async function bxChooseFace(c){
   c.face = null; c.faceNote = ''; c.faceFrom = -1;
-  const list = c.photos || [];
-  if (!list.length){ c.faceNote = 'no photo found'; return; }
-
-  const score = p => {
-    const img = c.images[p.image];
-    const area = (+p.w * +p.h) / Math.max(1, img.vision.w * img.vision.h);
-    return (+p.quality || 0) + (p.kind === 'portrait' ? 0.25 : 0) + Math.min(0.15, area * 1.5);
-  };
-  const best = list.slice().sort((a, b) => score(b) - score(a))[0];
-  await bxCropTo(c, best.image, best, (best.kind === 'portrait' ? 'photo' : 'face off the document')
-                                      + (list.length > 1 ? ` · best of ${list.length}` : ''));
+  const n = (c.photos || []).length;
+  c.faceNote = n ? `${n} face${n > 1 ? 's' : ''} detected — press CHOOSE to crop`
+                 : 'no photo found';
 }
 
 // Crop a box — in the coordinates the model was shown — out of the full
