@@ -2386,6 +2386,7 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
                 <option value="openrouter">OpenRouter Free Vision</option>
               </select>
               <button class="nb nb-blue nb-sm" id="btn-ocr" onclick="runOcr()">🔍 RUN GEMINI SCAN</button>
+              <button class="nb nb-orange nb-sm" onclick="openCompare()" title="Run this form through several models and compare what each one read">⚖ COMPARE MODELS</button>
               <button class="nb nb-ghost nb-sm" onclick="openLens('reg',0,'ai')" title="Pick text out of the image by hand">🔤 SELECT TEXT</button>
               <span class="size-badge" id="ai-size"></span>
             </div>
@@ -3404,6 +3405,60 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
 
     <div class="modal-footer">
       <button class="nb nb-ghost" onclick="closeWaModal()">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ COMPARE MODELS ═══ -->
+<style>
+.cmp-intro { background: var(--tint-blue); border: var(--b2); padding: 11px 14px;
+  font-size: 12.5px; line-height: 1.6; margin-bottom: 12px; }
+.cmp-models { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.cmp-chk { display: flex; align-items: center; gap: 6px; cursor: pointer;
+  border: var(--b2); background: var(--surface); color: var(--ink);
+  padding: 6px 10px; font-family: 'Space Mono', monospace; font-size: 11px; }
+.cmp-chk input { accent-color: var(--ink); }
+.cmp-cur { margin-left: 4px; background: var(--yellow); color: var(--black);
+  font-size: 8.5px; letter-spacing: 1px; padding: 1px 5px; }
+.cmp-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+#cmp-status { font-family: 'Space Mono', monospace; font-size: 10px;
+  letter-spacing: 1px; color: var(--muted-strong); }
+.cmp-scroll { overflow-x: auto; border: var(--b2); }
+.cmp-table { width: 100%; border-collapse: collapse; background: var(--surface); }
+.cmp-table th { background: var(--chrome); color: var(--yellow); text-align: left;
+  padding: 8px 10px; font-family: 'Space Mono', monospace; font-size: 10px;
+  letter-spacing: 1px; white-space: nowrap; }
+.cmp-table th span { display: block; color: var(--muted-2); font-size: 9px; letter-spacing: 0; }
+.cmp-table td { padding: 6px 10px; font-size: 12.5px; color: var(--ink);
+  border-top: 1px solid var(--surface-3); vertical-align: top; }
+.cmp-table td.cmp-f { font-family: 'Space Mono', monospace; font-size: 10px;
+  color: var(--muted-strong); white-space: nowrap; }
+.cmp-table tr.differ td { background: var(--tint-red); }
+.cmp-table tfoot td { border-top: var(--b2); font-family: 'Space Mono', monospace; font-size: 11px; }
+.cmp-na { color: var(--muted-2); }
+.cmp-errs { margin-top: 10px; border: var(--b2); background: var(--tint-red);
+  padding: 9px 12px; font-size: 12px; line-height: 1.6; }
+.cmp-apply { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.cmp-note { margin-top: 10px; font-size: 11.5px; line-height: 1.6; color: var(--muted-strong); }
+</style>
+<div class="overlay" id="cmp-overlay">
+  <div class="modal" style="max-width:940px;" role="dialog" aria-modal="true" aria-label="Compare models">
+    <button class="btn-x" onclick="closeCompare()" title="Close" aria-label="Close">✕</button>
+    <div class="modal-title">COMPARE <span class="hi">MODELS</span></div>
+    <div class="cmp-intro">
+      The same form image goes to every model you tick, and their answers line up
+      side by side. Rows where two models read the same box differently are marked —
+      those are the ones to check against the paper. Ten real forms will tell you
+      more about which model suits your handwriting than any benchmark.
+    </div>
+    <div id="cmp-models" class="cmp-models"></div>
+    <div class="cmp-bar">
+      <button class="nb nb-yellow nb-sm" id="cmp-run" onclick="runCompare()">▶ RUN COMPARISON</button>
+      <span id="cmp-status"></span>
+    </div>
+    <div id="cmp-results"></div>
+    <div class="modal-footer">
+      <button class="nb nb-ghost" onclick="closeCompare()">CLOSE</button>
     </div>
   </div>
 </div>
@@ -5585,6 +5640,178 @@ async function runOcr(){
 }
 
 function flash(el){el.classList.add('ai-fill');setTimeout(()=>el.classList.remove('ai-fill'),4000);}
+
+// ════════════════════════════════════════════════════════════════
+// COMPARE MODELS
+// Nobody publishes OCR accuracy for handwritten Indian forms, and general
+// benchmarks do not carry over to this handwriting, these scans, these names.
+// The only benchmark that counts is your own forms, so run one through several
+// models at once and read the answers side by side. Ten real forms settles it.
+// ════════════════════════════════════════════════════════════════
+let cmpRuns = [];
+
+function cmpCandidates(){
+  // whatever the key actually offers, best first; the built-in pair only
+  // stands in before the real list has come back
+  const list = (Array.isArray(BX_MODELS) && BX_MODELS.length) ? BX_MODELS : ['gemini-flash-latest','gemini-pro-latest'];
+  return bxRank(list).slice(0, 8);
+}
+
+async function openCompare(){
+  if (!aiEd) { toast('UPLOAD A FORM IMAGE FIRST','err'); return; }
+  try { geminiKey(); } catch(e){ toast(briefErr(e),'err'); return; }
+  cmpRuns = [];
+  document.getElementById('cmp-results').innerHTML = '';
+  document.getElementById('cmp-status').textContent = '';
+  // ask the key what it has, if that has not happened yet
+  if (!bxModelsLoaded) { document.getElementById('cmp-status').textContent = 'READING THE MODEL LIST…'; await bxLoadModels(true); }
+  renderCmpModels();
+  document.getElementById('cmp-status').textContent = '';
+  openOverlay('cmp-overlay');
+}
+function closeCompare(){ closeOverlay('cmp-overlay'); }
+
+function renderCmpModels(){
+  const box  = document.getElementById('cmp-models');
+  const list = cmpCandidates();
+  // the one in use, plus the next two: enough to judge without burning quota
+  const picks = [bxModel(), ...list.filter(m => m !== bxModel())].slice(0, 3);
+  box.innerHTML = '';
+  list.forEach(n => {
+    const lab = document.createElement('label');
+    lab.className = 'cmp-chk';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.value = n; cb.checked = picks.includes(n);
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode(' ' + n));
+    if (n === bxModel()) {
+      const tag = document.createElement('b');
+      tag.className = 'cmp-cur'; tag.textContent = 'IN USE';
+      lab.appendChild(tag);
+    }
+    box.appendChild(lab);
+  });
+}
+
+// Keep only the fields the prompt actually asked for, exactly as runOcr does —
+// a model that invents extra keys must not get them onto the form.
+function cmpSafeFields(fields){
+  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return null;
+  const allowed = Object.keys(JSON.parse(OCR_PROMPT.match(/\{[^]*\}/)[0]));
+  return Object.fromEntries(Object.entries(fields).filter(([k,v]) =>
+    allowed.includes(k) && (v == null || typeof v === 'string' || typeof v === 'number')));
+}
+
+async function runCompare(){
+  const picked = [...document.querySelectorAll('#cmp-models input:checked')].map(c => c.value);
+  if (!picked.length)    { toast('PICK AT LEAST ONE MODEL','err'); return; }
+  if (picked.length > 4) { toast('FOUR AT A TIME IS PLENTY','err'); return; }
+  const btn = document.getElementById('cmp-run');
+  const st  = document.getElementById('cmp-status');
+  let key, img;
+  try { key = geminiKey(); } catch(e){ toast(briefErr(e),'err'); return; }
+  btn.disabled = true;
+  cmpRuns = [];
+  st.textContent = 'PREPARING THE IMAGE…';
+  try { img = await aiScanImage(); }
+  catch(e){ st.textContent = ''; btn.disabled = false; toast('COULD NOT READ THE IMAGE: '+briefErr(e),'err'); return; }
+
+  // One at a time on purpose — the same reason the careful pool is size 1.
+  // A burst of parallel calls is the quickest way to get rate limits back
+  // instead of answers, which would tell you nothing about accuracy.
+  for (let i = 0; i < picked.length; i++) {
+    const m = picked[i];
+    st.textContent = `RUNNING ${i+1} OF ${picked.length} — ${m}`;
+    const t0 = performance.now();
+    try {
+      const text = await geminiVision(key, img, OCR_PROMPT, 2048, m);
+      const fields = cmpSafeFields(parseGeminiJson(text));
+      if (!fields) throw new Error('returned something that was not form data');
+      cmpRuns.push({ model:m, fields, ms: Math.round(performance.now()-t0) });
+    } catch(e) {
+      cmpRuns.push({ model:m, error: briefErr(e), ms: Math.round(performance.now()-t0) });
+    }
+    renderCmpResults();
+  }
+  const failed = cmpRuns.filter(r => r.error).length;
+  st.textContent = `DONE — ${cmpRuns.length - failed} ANSWERED${failed ? `, ${failed} FAILED` : ''}`;
+  btn.disabled = false;
+}
+
+function renderCmpResults(){
+  const box = document.getElementById('cmp-results');
+  if (!cmpRuns.length) { box.innerHTML = ''; return; }
+
+  let h = '<div class="cmp-scroll"><table class="cmp-table"><thead><tr><th>FIELD</th>';
+  cmpRuns.forEach(r => {
+    h += `<th>${escHtml(r.model)}<span>${r.error ? 'FAILED' : r.ms + ' ms'}</span></th>`;
+  });
+  h += '</tr></thead><tbody>';
+
+  DATA_FIELDS.forEach(f => {
+    const vals = cmpRuns.map(r => r.error ? '' : String(r.fields?.[f] ?? '').trim());
+    const filled = vals.filter(Boolean);
+    // A blank is not a contradiction, it is just a blank. Only flag rows where
+    // two models actually read the same box differently — those are the ones
+    // worth checking against the paper.
+    const agree = filled.length <= 1 || filled.every(v => v.toLowerCase() === filled[0].toLowerCase());
+    h += `<tr class="${agree ? '' : 'differ'}"><td class="cmp-f">${escHtml(f)}</td>`;
+    vals.forEach(v => { h += `<td>${v ? escHtml(v) : '<span class="cmp-na">—</span>'}</td>`; });
+    h += '</tr>';
+  });
+
+  h += '</tbody><tfoot><tr><td class="cmp-f">FIELDS READ</td>';
+  cmpRuns.forEach(r => {
+    const n = r.error ? 0 : DATA_FIELDS.filter(f => String(r.fields?.[f] ?? '').trim()).length;
+    h += `<td><b>${n}</b> / ${DATA_FIELDS.length}</td>`;
+  });
+  h += '</tr></tfoot></table></div>';
+
+  const errs = cmpRuns.filter(r => r.error);
+  if (errs.length) {
+    h += '<div class="cmp-errs">' + errs.map(r =>
+      `<div><b>${escHtml(r.model)}</b> — ${escHtml(r.error)}</div>`).join('') + '</div>';
+  }
+
+  h += '<div class="cmp-apply">';
+  cmpRuns.forEach((r,i) => {
+    if (r.error) return;
+    h += `<button class="nb nb-green nb-sm" data-use="${i}">✓ USE ${escHtml(r.model)}</button>`;
+    if (r.model !== bxModel())
+      h += `<button class="nb nb-ghost nb-sm" data-pin="${i}" title="Make this the model every scan uses">📌 PIN</button>`;
+  });
+  h += '</div>';
+  h += `<div class="cmp-note">More fields is not automatically better — a model that invents a
+        plausible pincode scores well and is wrong. Check the red rows against the paper form.</div>`;
+  box.innerHTML = h;
+}
+
+document.getElementById('cmp-results').addEventListener('click', e => {
+  const use = e.target.closest('button[data-use]');
+  if (use) {
+    const run = cmpRuns[+use.dataset.use];
+    if (!run || run.error) return;
+    const n = applyOcrFields(run.fields, 'r-');
+    closeCompare();
+    markDirty(); autoEmail();
+    toast(`FILLED ${n} FIELD(S) FROM ${run.model.toUpperCase()}`, 'ok');
+    return;
+  }
+  const pin = e.target.closest('button[data-pin]');
+  if (pin) {
+    const run = cmpRuns[+pin.dataset.pin];
+    if (!run) return;
+    bxCfg.model = run.model;
+    bxSaveCfg();
+    const el = document.getElementById('bx-model');
+    if (el) el.value = bxCfg.model;
+    if (typeof bxNote === 'function') bxNote();
+    renderCmpResults();
+    toast(`PINNED ${bxCfg.model.toUpperCase()} FOR EVERY SCAN`, 'ok');
+  }
+});
+document.getElementById('cmp-overlay').onclick = e => { if (e.target === e.currentTarget) closeCompare(); };
+
 
 // ════════════════════════════════════════════
 // BATCH SCAN
