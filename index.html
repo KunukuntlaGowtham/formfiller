@@ -5795,6 +5795,10 @@ const TOK_PRICES = {                    // USD per 1M tokens: [input, output]
   'gemini-3.1-flash-lite': [0.25,  1.50],
   'gemini-2.5-flash':      [0.30,  2.50]
 };
+// "gemini-flash-latest" is the app's default and is an alias — it resolves to
+// whichever flash is current, so no fixed price is honest for it. Unpriced
+// calls are counted and flagged rather than quietly totalled as zero, which
+// is what made the first version of this meter read $0.0000 for real work.
 function tokPrice(model){
   const s = String(model || '');
   const k = Object.keys(TOK_PRICES).find(p => s.startsWith(p));
@@ -5832,7 +5836,12 @@ function tokRender(){
   if (!tokUse.calls){ el.className = ''; el.textContent = ''; el.title = ''; return; }
   el.className = 'on';
   const unpriced = tokUse.calls - tokUse.priced;
-  el.textContent = `${tokUse.calls} scan${tokUse.calls>1?'s':''} · ${tokFmtUsd(tokUse.usd)}${unpriced?'+':''}`;
+  // tokens are exact; money is an estimate — so when no price is known, show
+  // the number that is actually true rather than a misleading zero
+  const billed = (tokUse.in + tokUse.out + tokUse.think);
+  el.textContent = tokUse.priced
+    ? `${tokUse.calls} scan${tokUse.calls>1?'s':''} · ${tokFmtUsd(tokUse.usd)}${unpriced?'+':''}`
+    : `${tokUse.calls} scan${tokUse.calls>1?'s':''} · ${billed.toLocaleString()} tokens`;
   el.title = `in ${tokUse.in.toLocaleString()} · out ${tokUse.out.toLocaleString()} · thinking ${tokUse.think.toLocaleString()}`
            + (unpriced ? `\n${unpriced} call(s) on a model with no price here — not counted` : '')
            + '\nclick for the breakdown';
@@ -5867,7 +5876,13 @@ function openTokens(){
     const perScan = tokUse.priced ? tokUse.usd / tokUse.priced : 0;
     if (perScan) h += `<p>About <b>${tokFmtUsd(perScan)} a scan</b> — roughly
             <b>${tokFmtUsd(perScan*1000)}</b> per thousand forms.</p>`;
-    h += `<p class="tok-small">Prices are the published per-million rates for these models and
+    if (tokUse.calls - tokUse.priced) h += `<p><b>${tokUse.calls - tokUse.priced} call(s) have no
+          price here</b> — a name like <code>gemini-flash-latest</code> is an alias that resolves to
+          whichever flash model is current, so no fixed rate is honest for it. Their tokens are
+          counted above; their cost is not.</p>`;
+    h += `<p class="tok-small">Token counts come from Google and are exact. The money is an
+          estimate: it does not know about your free tier, credits or tax, and it covers this
+          browser session only. Prices are the published per-million rates for these models and
           cover this browser session only. Google's own billing is the figure that counts.</p></div>`;
     box.innerHTML = h;
   }
@@ -6206,7 +6221,16 @@ function bxPaint(c){
     return;
   }
   if (c.status !== 'done' && c.status !== 'saved' && c.status !== 'blank'){
-    if (body.dataset.form) { body.innerHTML = ''; delete body.dataset.form; }
+    if (body.dataset.form) { delete body.dataset.form; }
+    // A card with pages on it and no scan yet used to show nothing at all, so
+    // the only way to read one was SCAN ALL — which also re-reads every other
+    // card and bills for all of them. One card, one call.
+    if (c.images.length && !bxRunning){
+      body.innerHTML = `<div class="bx-foot" style="margin-top:10px;">
+        <button class="nb nb-blue nb-sm" onclick="bxScanOne('${c.id}')">🔍 SCAN THIS CARD</button>
+        <span class="bx-note">${c.images.length} page${c.images.length > 1 ? 's' : ''} ready</span>
+      </div>`;
+    } else if (body.innerHTML) body.innerHTML = '';
     return;
   }
   if (body.dataset.form === c.id) { bxPaintFoot(c); return; }   // keep edits
@@ -6425,8 +6449,19 @@ function bxMsg(text, tone){
 // ── scanning ──────────────────────────────────────────────────────────────
 async function bxScanAll(){
   if (bxRunning) return;
-  const queue = bxCards.filter(c => c.images.length && c.status !== 'busy' && c.status !== 'saved');
-  if (!queue.length){ bxMsg('drop some images into a card first', 'warn'); return; }
+  // Cards already read are left alone. Re-queuing them meant adding one card
+  // to a batch of ten and paying to read all eleven — ten of those answers
+  // being ones already on screen. Failed and blank cards are still retried,
+  // and a single card can always be re-read with ↻ RESCAN on the card itself.
+  const queue = bxCards.filter(c => c.images.length
+    && c.status !== 'busy' && c.status !== 'saved' && c.status !== 'done');
+  const alreadyRead = bxCards.filter(c => c.images.length && c.status === 'done').length;
+  if (!queue.length){
+    bxMsg(alreadyRead
+      ? `all ${alreadyRead} card${alreadyRead > 1 ? 's are' : ' is'} read already — use ↻ RESCAN on a card to read one again`
+      : 'drop some images into a card first', 'warn');
+    return;
+  }
   let key;
   try { key = geminiKey(); }
   catch(e){ toast('CHECK THE GEMINI KEY','err'); bxMsg(e.message, 'err'); return; }
@@ -6435,7 +6470,7 @@ async function bxScanAll(){
   document.getElementById('bx-scan').disabled = true;
   const task = aiProgressStart(`READING ${queue.length} FORMS…`, '🔍', queue.length * 2500);
   let done = 0, failed = 0;
-  bxMsg(`reading ${queue.length}…`);
+  bxMsg(`reading ${queue.length}${alreadyRead ? ` · skipping ${alreadyRead} already read` : ''}…`);
 
   // A pool, not a flood: Gemini is happy with the concurrency, the browser is
   // less happy with twenty simultaneous multi-megabyte uploads.
@@ -6514,7 +6549,13 @@ async function bxScanOne(id, keyIn){
     // Flash handles clean paperwork. When it comes back unsure about something
     // the registration cannot do without, pay for one Pro read of that card
     // rather than making someone type the whole form.
-    if (bxShaky(f, (out && out.confidence) || {})){
+    //
+    // Careful mode only. This is a second FULL call, on a Pro model costing
+    // several times flash, and it fires whenever a required field is missing —
+    // including when the paper genuinely has no mobile number on it. On a batch
+    // of incomplete forms that was most of the bill, silently. Lean mode leaves
+    // the blank for a person to fill, which is the cheaper and clearer answer.
+    if (bxCareful() && bxShaky(f, (out && out.confidence) || {})){
       try {
         const better = bxShape(parseGeminiJson(await geminiMulti(key, imgs, BX_PROMPT, 0, bxSureModel())));
         if (better && better.fields){
@@ -6530,6 +6571,8 @@ async function bxScanOne(id, keyIn){
           c.model = 'read again on ' + bxSureModel().replace(/^gemini-/, '');
         }
       } catch(_){ c.model = 'second read unavailable'; }
+    } else if (!bxCareful() && bxShaky(f, (out && out.confidence) || {})){
+      c.model = 'gaps left for you — Careful would re-read this on a dearer model';
     }
 
     const fields = {};
