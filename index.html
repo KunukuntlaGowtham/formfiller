@@ -2386,6 +2386,11 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
                 <option value="gemini">Gemini</option>
                 <option value="openrouter">OpenRouter Free Vision</option>
               </select>
+              <select class="nb-select nb-sm" id="ocr-mode" aria-label="Reading mode" onchange="ocrSetMode()"
+                      title="Reasoning is billed as output — leaving it off is the single biggest saving">
+                <option value="fast">Lean — cheapest</option>
+                <option value="careful">Careful — costs more</option>
+              </select>
               <button class="nb nb-blue nb-sm" id="btn-ocr" onclick="runOcr()">🔍 RUN GEMINI SCAN</button>
               <button class="nb nb-ghost nb-sm" onclick="openLens('reg',0,'ai')" title="Pick text out of the image by hand">🔤 SELECT TEXT</button>
               <span class="size-badge" id="ai-size"></span>
@@ -2724,8 +2729,8 @@ body:not(.signed-out) #btn-signout{ display:inline-flex; }
       <div class="fld" style="margin:0;min-width:150px;">
         <label for="bx-mode">Reading</label>
         <select id="bx-mode" onchange="bxSetMode()">
-          <option value="careful">Careful — one at a time</option>
-          <option value="fast">Fast — four at once</option>
+          <option value="fast">Lean — cheapest, reasoning off</option>
+          <option value="careful">Careful — reasoning on, several times the cost</option>
         </select>
       </div>
       <button class="nb nb-ghost" onclick="bxAdd(1)">✚ ADD PERSON</button>
@@ -5663,10 +5668,18 @@ let BX_MODELS = ['gemini-flash-latest', 'gemini-pro-latest'];
 let BX_DEFAULT_MODEL = 'gemini-flash-latest';
 let bxModelsLoaded = false;
 
-let bxCfg = { model: BX_DEFAULT_MODEL, mode: 'careful' };
+// Lean by default. Reasoning is billed as output and was the bulk of the bill
+// — measured at roughly seven tokens charged for every ten of actual answer —
+// while the job here is reading a form and filling fields, not deliberating
+// about it. Careful stays one click away for a form that comes back wrong.
+let bxCfg = { model: BX_DEFAULT_MODEL, mode: 'fast' };
 try {
   const saved = JSON.parse(localStorage.getItem('sevak_bx_cfg') || '{}');
   if (saved && typeof saved === 'object') bxCfg = Object.assign(bxCfg, saved);
+  // "careful" used to be the default nobody chose, and it is the expensive
+  // one. A stored mode counts as a decision only once it has been made in the
+  // UI; until then the lean default applies. Chosen settings are never moved.
+  if (!saved || !saved.modePicked) bxCfg.mode = 'fast';
 } catch(_){}
 const bxSaveCfg = () => { try { localStorage.setItem('sevak_bx_cfg', JSON.stringify(bxCfg)); } catch(_){} };
 
@@ -5997,12 +6010,35 @@ function bxSetModel(){
 }
 function bxSetMode(){
   bxCfg.mode = document.getElementById('bx-mode')?.value === 'fast' ? 'fast' : 'careful';
+  bxCfg.modePicked = true;          // from here on it is a choice, not a default
   bxSaveCfg(); bxNote();
 }
 function bxNote(){
   bxMsg(bxCareful()
-    ? `${bxModel()} · one card at a time, ${VISION_CAREFUL_DIM}px, reasoning on — slower and more accurate`
-    : `${bxModel()} · four at once, ${VISION_MAX_DIM}px, reasoning off — quick pass`, 'muted');
+    ? `${bxModel()} · one card at a time, ${VISION_CAREFUL_DIM}px, reasoning ON — slower, and several times the cost per form`
+    : `${bxModel()} · four at once, ${VISION_MAX_DIM}px, reasoning off — the cheap setting`, 'muted');
+  bxSyncModeControls();
+}
+// The same switch decides what a single-form scan costs, so it cannot live
+// only in the batch panel where a register-tab operator never sees it.
+function bxSyncModeControls(){
+  ['bx-mode','ocr-mode'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value !== bxCfg.mode) el.value = bxCfg.mode;
+  });
+}
+// the register tab's copy has to show the real setting from the first paint
+if (document.readyState === 'loading')
+  document.addEventListener('DOMContentLoaded', () => bxSyncModeControls());
+else bxSyncModeControls();
+
+function ocrSetMode(){
+  bxCfg.mode = document.getElementById('ocr-mode')?.value === 'careful' ? 'careful' : 'fast';
+  bxCfg.modePicked = true;
+  bxSaveCfg();
+  if (typeof bxNote === 'function' && document.getElementById('bx-note')) bxNote();
+  else bxSyncModeControls();
+  toast(bxCareful() ? 'CAREFUL — REASONING ON, COSTS MORE' : 'LEAN — REASONING OFF', 'inf');
 }
 
 function bxAdd(n = 1, quiet){
